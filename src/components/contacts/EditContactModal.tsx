@@ -114,12 +114,18 @@ export const EditContactModal = ({ open, onOpenChange, contact }: EditContactMod
       toast({ title: '✅ Contacto actualizado', description: 'Los cambios se han sincronizado con éxito.' });
       onOpenChange(false);
     } catch (err) {
-      console.error(err);
-      toast({ title: 'Error al actualizar', variant: 'destructive' });
+      const error = err as Error;
+      console.error(error);
+      toast({ 
+        title: 'Error al actualizar', 
+        description: error.message || 'Verifica los datos del contacto.',
+        variant: 'destructive' 
+      });
     }
   };
 
-  const f = (field: string, value: any) => setForm(prev => ({ ...prev, [field]: value }));
+  const f = (field: keyof typeof form, value: string | number | boolean | null) => 
+    setForm(prev => ({ ...prev, [field]: value }));
   
   const inputClass = "w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-[#002B49] focus:outline-none focus:ring-4 focus:ring-[#005A92]/10 focus:bg-white transition-all placeholder:text-slate-300";
   const labelClass = "text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2 block";

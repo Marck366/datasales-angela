@@ -71,6 +71,8 @@ export interface Activity {
   created_by: string;
   created_by_profile?: Profile;
   created_at: string;
+  // Campos opcionales para vistas con joins
+  contact?: Partial<Contact> & { company?: Company };
 }
 
 export interface ESGEvent {

@@ -9,7 +9,7 @@ import { StatusBadge } from '@/components/contacts/StatusBadge';
 import { TipoBadge } from '@/components/contacts/TipoBadge';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
-import { Contact, PipelineType } from '@/types';
+import { Contact, PipelineType, Activity } from '@/types';
 import {
   Calendar, AlertCircle, ChevronDown, ChevronUp,
   Search, Users, Video, Phone as PhoneIcon, Monitor, Building2, Target,
@@ -215,8 +215,8 @@ const DashboardPage = () => {
         results.push({ contact: c, reason: `Reunión pasada sin cerrar (${d}d)`, urgencyScore: 90 + d });
       }
       if (c.status === 'nuevo' || c.status === 'propuesta_solicitada') {
-        const acts = activities.filter((a: any) => a.contact_id === c.id);
-        const latest = acts.length > 0 ? (acts as any[]).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]?.created_at : c.created_at;
+        const acts = (activities as Activity[]).filter(a => a.contact_id === c.id);
+        const latest = acts.length > 0 ? [...acts].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]?.created_at : c.created_at;
         const d = Math.floor((Date.now() - new Date(latest).getTime()) / 86400000);
         if (d >= 7) results.push({ contact: c, reason: `Sin contacto hace ${d} días`, urgencyScore: 50 + d });
       }
@@ -240,8 +240,8 @@ const DashboardPage = () => {
 
   const campaignSegments = useMemo(() => {
     const lastByContact: Record<string, string> = {};
-    activities.forEach((a: any) => {
-      if (['llamada', 'email', 'whatsapp', 'reunion'].includes(a.type) && (!lastByContact[a.contact_id] || new Date(a.created_at) > new Date(lastByContact[a.contact_id])))
+    (activities as Activity[]).forEach(a => {
+      if (a.type && ['llamada', 'email', 'whatsapp', 'reunion'].includes(a.type) && (!lastByContact[a.contact_id] || new Date(a.created_at) > new Date(lastByContact[a.contact_id])))
         lastByContact[a.contact_id] = a.created_at;
     });
     const daysSince = (id: string) => {
@@ -258,9 +258,9 @@ const DashboardPage = () => {
 
   const perdidoMotivos = useMemo(() => {
     const counts: Record<string, number> = {};
-    activities
-      .filter((a: any) => a.type === 'estado' && a.new_value === 'perdido')
-      .forEach((a: any) => {
+    (activities as Activity[])
+      .filter(a => a.type === 'estado' && a.new_value === 'perdido')
+      .forEach(a => {
         const motivo = a.content ? a.content.split(' · ')[0].trim() : 'Sin registrar';
         counts[motivo] = (counts[motivo] ?? 0) + 1;
       });

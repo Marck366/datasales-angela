@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronDown, ChevronUp, Search, ArrowRight, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from '@/hooks/use-toast';
+import { Activity } from '@/types';
 
 const activityIcons: Record<string, string> = {
   nota: '📝', llamada: '📞', email: '✉️', whatsapp: '💬', reunion: '🤝', estado: '🔄',
@@ -36,7 +37,7 @@ interface GroupedClient {
   companyName: string;
   status: string;
   lastActivityAt: string;
-  activities: any[];
+  activities: Activity[];
 }
 
 import { VoiceInputButton } from '@/components/ui/VoiceInputButton';
@@ -163,7 +164,7 @@ const NotesPage = () => {
 
   /* ── Feed: agrupar por día ── */
   const feedByDay = useMemo(() => {
-    const groups: Record<string, any[]> = {};
+    const groups: Record<string, Activity[]> = {};
     for (const a of filteredActivities) {
       const day = new Date(a.created_at).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
       if (!groups[day]) groups[day] = [];
@@ -287,11 +288,11 @@ const NotesPage = () => {
 
                         <CollapsibleContent>
                           <div className="mx-4 mb-4 border-l-2 border-primary/20 pl-4 space-y-3">
-                            {group.activities.map((a: any) => {
+                            {group.activities.map((a: Activity) => {
                               const highlight = search.trim() && a.content?.toLowerCase().includes(search.toLowerCase());
                               return (
                                 <div key={a.id} className={`flex items-start gap-3 p-2 rounded-xl transition-colors ${highlight ? 'bg-primary/5 border border-primary/20' : ''}`}>
-                                  <span className="text-base mt-0.5 shrink-0">{activityIcons[a.type] || '📌'}</span>
+                                  <span className="text-base mt-0.5 shrink-0">{activityIcons[a.type || 'nota'] || '📌'}</span>
                                   <div className="flex-1 min-w-0">
                                     {a.type === 'estado' ? (
                                       <p className="text-sm text-foreground">
@@ -329,7 +330,7 @@ const NotesPage = () => {
                     <div key={day}>
                       <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3 capitalize">{day}</p>
                       <div className="space-y-2">
-                        {acts.map((a: any) => (
+                        {acts.map((a: Activity) => (
                           <motion.div
                             key={a.id}
                             initial={{ opacity: 0, x: -8 }}
@@ -337,7 +338,7 @@ const NotesPage = () => {
                             className="glass rounded-2xl p-3 flex items-start gap-3 cursor-pointer hover:bg-card/80 transition-colors"
                             onClick={() => navigate(`/contact/${a.contact_id}`)}
                           >
-                            <span className="text-base shrink-0 mt-0.5">{activityIcons[a.type] || '📌'}</span>
+                            <span className="text-base shrink-0 mt-0.5">{activityIcons[a.type || 'nota'] || '📌'}</span>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-0.5">
                                 <p className="text-xs font-bold text-foreground truncate">

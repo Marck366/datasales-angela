@@ -2,6 +2,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useContacts } from '@/hooks/useContacts';
 import { useAllActivities } from '@/hooks/useActivities';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { Activity } from '@/types';
 import { motion } from 'framer-motion';
 import { LogOut, TrendingUp, Target, Briefcase, Activity as ActivityIcon, ChevronLeft } from 'lucide-react';
 import { useMemo } from 'react';
@@ -21,7 +22,7 @@ const ProfilePage = () => {
 
   const myActivities = useMemo(() => {
     if (!user) return [];
-    return allActivities.filter((a: any) => a.created_by === user.id).slice(0, 10);
+    return (allActivities as Activity[]).filter(a => a.created_by === user.id).slice(0, 10);
   }, [allActivities, user]);
 
   // 2. Calcular KPIs
@@ -161,7 +162,7 @@ const ProfilePage = () => {
             ) : (
               <div className="relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border before:to-transparent">
                 <div className="space-y-6">
-                  {myActivities.map((act: any, idx: number) => {
+                  {myActivities.map((act: Activity) => {
                     // Encontrar a qué contacto pertenece para mostrar el nombre
                     const targetContact = allContacts.find(c => c.id === act.contact_id);
                     const contactName = targetContact ? (targetContact.company?.name || `${targetContact.first_name} ${targetContact.last_name}`) : 'Contacto desconocido';
