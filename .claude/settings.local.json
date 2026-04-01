@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /Users/marcos/DAT?SALES/src/lib/)",
+      "Bash(ls /Users/marcos/DAT?SALES/src/hooks/)",
+      "Bash(cd /Users/marcos/DAT?SALES)",
+      "Bash(npx tsc:*)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(brew list:*)",
+      "Bash(sed -i '' 's/\\\\\"\"nevera-bg\\\\\"\": \\\\\"\"hsl\\(var\\(--status-nevera-bg\\)\\)\\\\\"\",/\\\\\"\"pospuesto-bg\\\\\"\": \\\\\"\"hsl\\(var\\(--status-pospuesto-bg\\)\\)\\\\\"\",/' \"/Users/marcos/DATÂSALES/tailwind.config.ts\")",
+      "Bash(sed -i '' 's/\\\\\"\"nevera-fg\\\\\"\": \\\\\"\"hsl\\(var\\(--status-nevera-fg\\)\\)\\\\\"\",/\\\\\"\"pospuesto-fg\\\\\"\": \\\\\"\"hsl\\(var\\(--status-pospuesto-fg\\)\\)\\\\\"\",/' \"/Users/marcos/DATÂSALES/tailwind.config.ts\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(''''vite:'''', d.get\\(''''scripts'''',{}\\).get\\(''''dev'''',''''''''\\)\\)\")",
+      "Bash(grep -r \"hardcode\\\\|password\\\\|secret\\\\|API_KEY\" /Users/marcos/DATÂSALES/src --include=*.ts --include=*.tsx)"
+    ]
+  }
+}
