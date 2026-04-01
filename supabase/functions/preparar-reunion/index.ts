@@ -50,8 +50,11 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     
     if (authError || !user) {
-      console.error('Auth error:', authError);
-      return new Response(JSON.stringify({ error: 'Sesión inválida', details: 'Por favor, inicia sesión de nuevo.' }), {
+      console.error('Auth error detail:', authError);
+      return new Response(JSON.stringify({ 
+        error: 'Sesión inválida', 
+        details: authError?.message || 'No se pudo verificar la sesión del usuario en la función.' 
+      }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
