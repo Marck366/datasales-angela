@@ -262,7 +262,7 @@ Requiere: ANTHROPIC_API_KEY en secrets de Supabase
 ### `create-test-users`
 ```
 POST /functions/v1/create-test-users
-Uso exclusivo admin: resetea contraseñas de todos los usuarios a "Datasales2026"
+[ELIMINADO] - Recordatorio de seguridad: Administrar contraseñas vía consola de Supabase.
 ```
 
 ---
