@@ -1,0 +1,17 @@
+{
+  "name": "DatâSales",
+  "short_name": "DatâSales",
+  "description": "La app comercial de Fricción Cero — Ângela Impact Economy",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F2552",
+  "theme_color": "#0F2552",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ]
+}

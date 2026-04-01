@@ -1,0 +1,180 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 33% 99%;
+    --foreground: 215 28% 17%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 28% 17%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 28% 17%;
+
+    --primary: 201 100% 24%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 196 100% 47%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 72 63% 51%;
+    --accent-foreground: 201 100% 24%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 201 100% 24%;
+
+    --radius: 1.5rem;
+
+    /* Brand tokens */
+    --navy: 201 100% 24%; /* #00507B */
+    --sky-blue: 196 100% 47%; /* #00AEEF */
+    --lime: 72 63% 51%; /* #B2D235 */
+
+    /* Status tokens (Light) */
+    --status-nuevo-bg: 196 100% 95%;
+    --status-nuevo-fg: 196 100% 40%;
+    --status-agendado-bg: 35 100% 95%;
+    --status-agendado-fg: 35 100% 45%;
+    --status-cerrado-bg: 72 63% 90%;
+    --status-cerrado-fg: 72 80% 30%;
+    --status-perdido-bg: 0 84% 95%;
+    --status-perdido-fg: 0 84% 50%;
+    --status-pospuesto-bg: 214 32% 95%;
+    --status-pospuesto-fg: 214 32% 40%;
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 201 100% 24%;
+    --sidebar-primary: 201 100% 24%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 201 100% 24%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 201 100% 24%;
+    
+    /* Utilities support */
+    --shadow-glass: 0 40px 80px -20px rgba(0, 43, 73, 0.15); /* Sombra más profunda y elegante corporativa */
+    --border-glass: rgba(0, 80, 123, 0.04);
+  }
+
+  .dark {
+    --background: 205 100% 11%; /* #001a2d - Deep Navy base for high-end look */
+    --foreground: 210 33% 99%;
+
+    --card: 205 100% 15%; /* #002B49 - Official Angela Navy for cards */
+    --card-foreground: 210 33% 99%;
+
+    --popover: 205 100% 15%;
+    --popover-foreground: 210 33% 99%;
+
+    --primary: 196 100% 47%; /* Sky Blue for primary actions in dark */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 205 100% 20%;
+    --secondary-foreground: 210 33% 99%;
+
+    --muted: 205 100% 20%;
+    --muted-foreground: 215 20% 85%;
+
+    --accent: 72 63% 51%; /* Lime remains for specific accents */
+    --accent-foreground: 201 100% 10%;
+
+    --border: 205 100% 22%;
+    --input: 205 100% 22%;
+    --ring: 196 100% 47%;
+    
+    --radius: 1.5rem;
+
+    /* Brand tokens - Ensure they are consistent */
+    --navy: 205 100% 15%;
+    --sky-blue: 196 100% 47%;
+    --lime: 72 63% 51%;
+
+    /* Status tokens (Dark Premium - Enhanced contrast) */
+    --status-nuevo-bg: 196 100% 18%;
+    --status-nuevo-fg: 196 100% 75%;
+    --status-agendado-bg: 35 100% 18%;
+    --status-agendado-fg: 35 100% 75%;
+    --status-cerrado-bg: 72 63% 18%;
+    --status-cerrado-fg: 72 100% 75%;
+    --status-perdido-bg: 0 62% 18%;
+    --status-perdido-fg: 0 100% 75%;
+    --status-pospuesto-bg: 205 100% 22%;
+    --status-pospuesto-fg: 215 20% 85%;
+
+    --sidebar-background: 205 100% 12%;
+    --sidebar-foreground: 210 33% 99%;
+    --sidebar-primary: 196 100% 47%;
+    --sidebar-primary-foreground: 205 100% 10%;
+    --sidebar-accent: 205 100% 20%;
+    --sidebar-accent-foreground: 210 33% 99%;
+    --sidebar-border: 205 100% 20%;
+    --sidebar-ring: 196 100% 47%;
+
+    /* Utilities support */
+    --shadow-glass: 0 30px 60px -15px rgba(0, 0, 0, 0.6);
+    --border-glass: rgba(255, 255, 255, 0.08);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply bg-background;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased transition-colors duration-500;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-semibold tracking-tight;
+  }
+}
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+  .glass {
+    @apply bg-card/70 backdrop-blur-2xl transition-all duration-500;
+    border: 1px solid var(--border-glass);
+    box-shadow: var(--shadow-glass);
+  }
+  .glass-panel {
+    @apply bg-background/80 backdrop-blur-3xl transition-all duration-500;
+    border: 1px solid var(--border-glass);
+    box-shadow: var(--shadow-glass);
+  }
+  .text-glow {
+    text-shadow: 0 0 30px hsl(var(--primary) / 0.4);
+  }
+
+  .animate-pulse-subtle {
+    animation: pulse-subtle 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse-subtle {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.85; transform: scale(0.98); }
+  }
+}
