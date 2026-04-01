@@ -3,9 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 
-  import.meta.env.VITE_SUPABASE_ANON_KEY || 
-  "REMOVED";
+const rawKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Forzamos el uso de la clave nueva si la detectada no tiene el prefijo correcto
+const SUPABASE_PUBLISHABLE_KEY = rawKey?.startsWith('sb_') ? rawKey : "REMOVED";
 
 // Blindaje contra variables ausentes para evitar el "pantallazo blanco" crítico
 if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
