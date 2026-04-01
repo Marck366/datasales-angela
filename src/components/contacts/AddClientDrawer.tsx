@@ -10,6 +10,7 @@ import { useCreateContact } from '@/hooks/useContacts';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { calcSemanaLabel } from '@/lib/semana';
+import { ContactStatus, Priority } from '@/types';
 
 const SERVICIOS = ['B Corp', 'CSRD', 'Huella Carbono', 'ESG Reporting', 'Otro'];
 const CERTIFICACIONES = ['Sin proceso', 'En evaluación', 'En proceso', 'Certificado'];
@@ -54,8 +55,8 @@ const AddClientDrawer = ({ open, onOpenChange }: { open: boolean; onOpenChange: 
         phone: form.telefono || undefined,
         linkedin_url: form.linkedin || undefined,
         pipeline: form.pipeline,
-        status: form.estado as any,
-        prioridad: form.prioridad as any,
+        status: form.estado as ContactStatus,
+        prioridad: form.prioridad as Priority,
         valor_potencial: form.valor ? Number(form.valor) : undefined,
         probabilidad_cierre: form.probabilidad_cierre ? Number(form.probabilidad_cierre) : undefined,
         semana: semanaLabel,
@@ -72,8 +73,13 @@ const AddClientDrawer = ({ open, onOpenChange }: { open: boolean; onOpenChange: 
       setForm({ empresa: '', nombre: '', apellido: '', email: '', telefono: '', linkedin: '', pipeline: 'captura', estado: 'nuevo', prioridad: 'media', valor: '', notas: '', tipo: 'Cliente', servicio_interes: '', estado_certificacion: '', empleados_empresa: '', decision_maker: false, probabilidad_cierre: '' });
       setSemanaDate(undefined);
       setEsgOpen(false);
-    } catch {
-      toast({ title: 'Error al registrar', variant: 'destructive' });
+    } catch (err) {
+      const error = err as Error;
+      toast({ 
+        title: 'Error al registrar', 
+        description: error.message || 'Verifica los datos del cliente.',
+        variant: 'destructive' 
+      });
     }
   };
 
