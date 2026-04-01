@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const ALLOWED_ORIGINS = [
   'https://datasales.angelaimpacteconomy.com',
+  'https://datasales-angela-git-dev-marck366s-projects.vercel.app',
   'http://localhost:8080',
   'http://localhost:5173',
 ];
