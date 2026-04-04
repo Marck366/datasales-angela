@@ -24,13 +24,6 @@ Deno.serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  // Health check — sin datos sensibles
-  if (req.method === 'GET') {
-    return new Response(JSON.stringify({ status: 'ok' }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
   try {
     // 1. Validar autenticación
     const authHeader = req.headers.get('Authorization');
@@ -50,10 +43,9 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     
     if (authError || !user) {
-      console.error('Auth error detail:', authError);
       return new Response(JSON.stringify({ 
         error: 'Sesión inválida', 
-        details: authError?.message || 'No se pudo verificar la sesión del usuario en la función.' 
+        details: authError?.message || 'No se pudo verificar la sesión del usuario.' 
       }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -89,7 +81,7 @@ Deno.serve(async (req: Request) => {
     const prompt = `Eres el asistente comercial de Ângela Impact Economy, consultora ESG española (B Corp, CSRD, huella de carbono).
 
 DATOS DEL CONTACTO:
-- Empresa: ${contact.company_name ?? 'desconocida'}
+- Empresa: ${contact.company?.name ?? contact.company_name ?? 'desconocida'}
 - Contacto: ${contact.first_name} ${contact.last_name}
 - Estado actual: ${contact.status}
 - Prioridad: ${contact.prioridad}
@@ -125,7 +117,7 @@ Sé directo, práctico y breve.`;
     if (!response.ok) {
       console.error('Anthropic error:', response.status, JSON.stringify(data));
       return new Response(JSON.stringify({
-        error: 'Error al generar el brief. Inténtalo de nuevo.',
+        error: data?.error?.message || 'Error al generar el brief. Inténtalo de nuevo.',
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -141,7 +133,7 @@ Sé directo, práctico y breve.`;
   } catch (error: any) {
     console.error('Function error:', error.message);
     return new Response(JSON.stringify({
-      error: 'Error interno. Inténtalo de nuevo.',
+      error: 'Error interno. ' + error.message,
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

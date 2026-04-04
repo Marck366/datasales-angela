@@ -20,7 +20,7 @@ const LoginPage = () => {
     const { error: signInError } = await signIn(email, password);
 
     if (signInError) {
-      setError('Credenciales inválidas. Por favor, inténtalo de nuevo.');
+      setError(signInError.message || 'Credenciales inválidas. Por favor, inténtalo de nuevo.');
       setIsLoading(false);
     } else {
       navigate('/');
