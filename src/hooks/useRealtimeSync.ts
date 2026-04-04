@@ -36,7 +36,11 @@ export const useRealtimeSync = () => {
           qc.invalidateQueries({ queryKey: ['events'] });
         }
       )
-      .subscribe(() => {});
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          console.error('Realtime: fallo en la suscripción — los datos en tiempo real pueden retrasarse.');
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);

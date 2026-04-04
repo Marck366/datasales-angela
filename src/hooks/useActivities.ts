@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Activity, ActivityType, UserRole } from '@/types';
+import { Activity, ActivityType, ContactStatus, Priority, UserRole } from '@/types';
 import { Tables } from '@/integrations/supabase/types';
 
 type ActivityRow = Tables<'activities'> & {
@@ -50,8 +50,8 @@ export const useActivities = (contactId?: string) => {
 export const useAllActivities = () => {
   return useQuery({
     queryKey: ['activities', 'all'],
-    staleTime: 0,
-    refetchOnMount: true,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('activities')
@@ -72,8 +72,8 @@ export const useAllActivities = () => {
             sector: row.contacts.companies.sector || undefined,
             created_at: row.contacts.companies.created_at || ''
           } : undefined,
-          status: row.contacts.status as any, // Cast temporarily to match partial
-          prioridad: row.contacts.prioridad as any,
+          status: (row.contacts.status as ContactStatus) || 'nuevo',
+          prioridad: (row.contacts.prioridad as Priority) || 'media',
           seguimiento_date: row.contacts.seguimiento_date || undefined,
         } : undefined,
       }));

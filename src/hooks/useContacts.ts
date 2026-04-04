@@ -83,8 +83,8 @@ const mapContact = (row: ContactRow): Contact => ({
 export const useContacts = (filterByUserId?: string | null) => {
   return useQuery({
     queryKey: ['contacts', filterByUserId ?? 'all'],
-    staleTime: 0,
-    refetchOnMount: true,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       let query = supabase
         .from('contacts')
