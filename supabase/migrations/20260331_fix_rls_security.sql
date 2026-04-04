@@ -4,12 +4,13 @@ DROP POLICY IF EXISTS "Activities viewable by authenticated" ON public.activitie
 
 -- Paso 2: Crear política de acceso restringido
 -- Solo pueden ver actividades si el usuario tiene rol elevado o es el asignado al contacto
+DROP POLICY IF EXISTS "Activities viewable by assigned or elevated" ON public.activities;
 CREATE POLICY "Activities viewable by assigned or elevated"
   ON public.activities FOR SELECT TO authenticated
   USING (
-    public.has_elevated_role(auth.uid()) OR 
+    public.has_elevated_role(auth.uid()) OR
     EXISTS (
-      SELECT 1 FROM public.contacts 
+      SELECT 1 FROM public.contacts
       WHERE id = activities.contact_id AND assigned_to = auth.uid()
     )
   );
@@ -17,6 +18,7 @@ CREATE POLICY "Activities viewable by assigned or elevated"
 -- SEC-003: Restricción de Empresas
 -- Paso 3: Asegurar que solo roles elevados o creadores pueden modificar empresas
 DROP POLICY IF EXISTS "Companies updatable by authenticated" ON public.companies;
+DROP POLICY IF EXISTS "Companies updatable by elevated roles" ON public.companies;
 
 CREATE POLICY "Companies updatable by elevated roles"
   ON public.companies FOR UPDATE TO authenticated

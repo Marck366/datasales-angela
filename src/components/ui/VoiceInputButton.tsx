@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Loader2 } from 'lucide-react';
+import { Mic, MicOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 
@@ -9,11 +9,42 @@ interface VoiceInputButtonProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
+// Define types for Web Speech API to avoid 'any'
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: {
+    length: number;
+    [index: number]: {
+      isFinal: boolean;
+      [index: number]: {
+        transcript: string;
+      };
+    };
+  };
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+
+interface SpeechRecognitionInstance extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
 export const VoiceInputButton = ({ onTranscript, className, size = 'md' }: VoiceInputButtonProps) => {
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(true);
   const [isSecure, setIsSecure] = useState(true);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const lastFinalTranscriptRef = useRef<string>('');
 
   useEffect(() => {
@@ -27,11 +58,10 @@ export const VoiceInputButton = ({ onTranscript, className, size = 'md' }: Voice
     
     if (!SpeechRecognition) {
       setIsSupported(false);
-      console.warn('SpeechRecognition no soportado en este navegador');
       return;
     }
 
-    const recognition = new SpeechRecognition();
+    const recognition = new SpeechRecognition() as SpeechRecognitionInstance;
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'es-ES';
@@ -41,7 +71,7 @@ export const VoiceInputButton = ({ onTranscript, className, size = 'md' }: Voice
       lastFinalTranscriptRef.current = '';
     };
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
       let finalTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
@@ -57,8 +87,7 @@ export const VoiceInputButton = ({ onTranscript, className, size = 'md' }: Voice
       }
     };
 
-    recognition.onerror = (event: any) => {
-      console.error('Speech recognition error', event.error);
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       if (event.error === 'not-allowed') {
         toast({ title: 'Permiso denegado', description: 'Permite el acceso al micrófono en los ajustes de tu navegador.', variant: 'destructive' });
       } else if (event.error !== 'no-speech') {
@@ -71,7 +100,14 @@ export const VoiceInputButton = ({ onTranscript, className, size = 'md' }: Voice
     recognitionRef.current = recognition;
 
     return () => {
-      if (recognitionRef.current) recognitionRef.current.abort();
+      if (recognitionRef.current) {
+        recognitionRef.current.onstart = null;
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.abort();
+        recognitionRef.current = null;
+      }
     };
   }, [onTranscript]);
 
@@ -100,12 +136,19 @@ export const VoiceInputButton = ({ onTranscript, className, size = 'md' }: Voice
       try {
         recognitionRef.current?.start();
       } catch (e) {
-        console.error('Failed to start recognition', e);
         setIsListening(false);
         try {
           recognitionRef.current?.abort();
-          setTimeout(() => recognitionRef.current?.start(), 100);
-        } catch {}
+          setTimeout(() => {
+            try {
+              recognitionRef.current?.start();
+            } catch (retryError) {
+              console.error('Failed to restart recognition after abort', retryError);
+            }
+          }, 100);
+        } catch (abortError) {
+          console.error('Critical voice failure:', abortError);
+        }
       }
     }
   };

@@ -26,7 +26,6 @@ export const useRealtimeSync = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'activities' },
         () => {
-          console.log('Realtime: activities changed, invalidating cache');
           qc.invalidateQueries({ queryKey: ['activities'] });
         }
       )
@@ -34,16 +33,16 @@ export const useRealtimeSync = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'events' },
         () => {
-          console.log('Realtime: events changed, invalidating cache');
           qc.invalidateQueries({ queryKey: ['events'] });
         }
       )
-      .subscribe((status, err) => {
-        console.log('Global Realtime Channel Status:', status, err);
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          console.error('Realtime: fallo en la suscripción — los datos en tiempo real pueden retrasarse.');
+        }
       });
 
     return () => {
-      console.log('Unsubscribing from global Realtime channel');
       supabase.removeChannel(channel);
     };
   }, [qc]);

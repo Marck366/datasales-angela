@@ -1,6 +1,27 @@
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Contact, ContactStatus, PipelineType } from '@/types';
+import { Contact, ContactStatus, PipelineType, Priority, UserRole } from '@/types';
+import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+
+// Extend the auto-generated row types to match the real schema used in the app
+type ContactRow = Tables<'contacts'> & {
+  companies: Tables<'companies'> | null;
+  profiles: Tables<'profiles'> | null;
+  // Fields that might be missing from the auto-generated types but exist in DB
+  pipeline?: string | null;
+  prioridad?: string | null;
+  lost_reason?: string | null;
+  status_changed_at?: string | null;
+  last_activity_at?: string | null;
+  servicio_interes?: string | null;
+  estado_certificacion?: string | null;
+  empleados_empresa?: string | null;
+  decision_maker?: boolean | null;
+  probabilidad_cierre?: number | null;
+  fecha_cierre_probable?: string | null;
+  next_step?: string | null;
+  score_ai?: number | null;
+};
 
 /** Invalidate React Query caches affected by contact changes. Call after create/update/delete. */
 export function invalidateContactCaches(qc: QueryClient) {
@@ -10,48 +31,60 @@ export function invalidateContactCaches(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: ['dashboard_ranking'] });
 }
 
-const mapContact = (row: any): Contact => ({
+const mapContact = (row: ContactRow): Contact => ({
   id: row.id,
-  company_id: row.company_id,
-  company: row.companies ? { id: row.companies.id, name: row.companies.name, sector: row.companies.sector, created_at: row.companies.created_at } : undefined,
+  company_id: row.company_id || '',
+  company: row.companies ? { 
+    id: row.companies.id, 
+    name: row.companies.name, 
+    sector: row.companies.sector || undefined, 
+    created_at: row.companies.created_at || '' 
+  } : undefined,
   first_name: row.first_name,
   last_name: row.last_name,
-  email: row.email,
-  phone: row.phone,
-  linkedin_url: row.linkedin_url,
-  job_title: row.job_title,
-  assigned_to: row.assigned_to,
-  assigned_profile: row.profiles ? { id: row.profiles.id, name: row.profiles.name, email: row.profiles.email, role: row.profiles.role, avatar_color: row.profiles.avatar_color, created_at: row.profiles.created_at } : undefined,
-  status: row.status as ContactStatus,
-  pipeline: row.pipeline as any,
-  semana: row.semana,
-  semana_date: row.semana_date,
-  scheduled_date: row.scheduled_date,
-  meeting_type: row.meeting_type,
-  valor_potencial: row.valor_potencial,
-  prioridad: row.prioridad,
+  email: row.email || undefined,
+  phone: row.phone || undefined,
+  linkedin_url: row.linkedin_url || undefined,
+  job_title: row.job_title || undefined,
+  assigned_to: row.assigned_to || '',
+  assigned_profile: row.profiles ? { 
+    id: row.profiles.id, 
+    name: row.profiles.name, 
+    email: row.profiles.email, 
+    role: (row.profiles.role as UserRole) || 'comercial', 
+    avatar_color: row.profiles.avatar_color || 'gray', 
+    created_at: row.profiles.created_at || '' 
+  } : undefined,
+  status: (row.status as ContactStatus) || 'nuevo',
+  pipeline: (row.pipeline as PipelineType) || 'captura',
+  semana: row.semana || undefined,
+  semana_date: row.semana_date || undefined,
+  scheduled_date: row.scheduled_date || undefined,
+  meeting_type: row.meeting_type || undefined,
+  valor_potencial: row.valor_potencial || undefined,
+  prioridad: (row.prioridad as Priority) || 'media',
   tipo: row.tipo || 'Cliente',
-  seguimiento_date: row.seguimiento_date,
-  lost_reason: row.lost_reason,
-  status_changed_at: row.status_changed_at,
-  last_activity_at: row.last_activity_at,
-  servicio_interes: row.servicio_interes,
-  estado_certificacion: row.estado_certificacion,
-  empleados_empresa: row.empleados_empresa,
+  seguimiento_date: row.seguimiento_date || undefined,
+  lost_reason: row.lost_reason || undefined,
+  status_changed_at: row.status_changed_at || undefined,
+  last_activity_at: row.last_activity_at || undefined,
+  servicio_interes: row.servicio_interes || undefined,
+  estado_certificacion: row.estado_certificacion || undefined,
+  empleados_empresa: row.empleados_empresa || undefined,
   decision_maker: row.decision_maker ?? false,
-  probabilidad_cierre: row.probabilidad_cierre,
-  fecha_cierre_probable: row.fecha_cierre_probable,
-  next_step: row.next_step,
+  probabilidad_cierre: row.probabilidad_cierre || undefined,
+  fecha_cierre_probable: row.fecha_cierre_probable || undefined,
+  next_step: row.next_step || undefined,
   score_ai: row.score_ai ?? 0,
-  created_at: row.created_at,
-  updated_at: row.updated_at,
+  created_at: row.created_at || '',
+  updated_at: row.updated_at || '',
 });
 
 export const useContacts = (filterByUserId?: string | null) => {
   return useQuery({
     queryKey: ['contacts', filterByUserId ?? 'all'],
-    staleTime: 0,
-    refetchOnMount: true,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       let query = supabase
         .from('contacts')
@@ -61,9 +94,9 @@ export const useContacts = (filterByUserId?: string | null) => {
         query = query.eq('assigned_to', filterByUserId);
       }
 
-      const { data, error } = await (query.order('created_at', { ascending: false }) as any);
+      const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw error;
-      return (data || []).map(mapContact);
+      return ((data as unknown as ContactRow[]) || []).map(mapContact);
     },
   });
 };
@@ -73,13 +106,13 @@ export const useContact = (id: string | undefined) => {
     queryKey: ['contacts', id],
     enabled: !!id,
     queryFn: async () => {
-      const { data, error } = await (supabase
+      const { data, error } = await supabase
         .from('contacts')
         .select('*, companies(*), profiles!contacts_assigned_to_fkey(*)')
         .eq('id', id!)
-        .single() as any);
+        .single();
       if (error) throw error;
-      return mapContact(data);
+      return mapContact(data as unknown as ContactRow);
     },
   });
 };
@@ -88,11 +121,16 @@ export const useUpdateContactStatus = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, status, scheduled_date, meeting_type, seguimiento_date, lost_reason, next_step }: { id: string; status: ContactStatus; scheduled_date?: string; meeting_type?: string; seguimiento_date?: string; lost_reason?: string; next_step?: string | null }) => {
-      const updateData: Record<string, any> = { status, scheduled_date: scheduled_date || null, updated_at: new Date().toISOString() };
+      const updateData: TablesUpdate<'contacts'> & Record<string, unknown> = { 
+        status, 
+        scheduled_date: scheduled_date || null, 
+        updated_at: new Date().toISOString() 
+      };
       if (meeting_type !== undefined) updateData.meeting_type = meeting_type;
       if (seguimiento_date !== undefined) updateData.seguimiento_date = seguimiento_date;
       if (lost_reason !== undefined) updateData.lost_reason = lost_reason;
       if (next_step !== undefined) updateData.next_step = next_step;
+      
       const { error } = await supabase.from('contacts').update(updateData).eq('id', id);
       if (error) throw error;
     },
@@ -124,13 +162,19 @@ export const useUpdateContact = () => {
       score_ai?: number;
     }) => {
       if (input.empresa || input.pipeline) {
-        const { data: contact } = await (supabase.from('contacts').select('company_id, pipeline').eq('id', input.id).single() as any);
+        // Cast to unknown first to bypass missing 'pipeline' in base generated types
+        const { data: contact } = await (supabase
+          .from('contacts')
+          .select('company_id, pipeline')
+          .eq('id', input.id)
+          .single() as unknown as Promise<{ data: { company_id: string; pipeline: string } | null }>);
+          
         if (input.empresa && contact?.company_id) {
           await supabase.from('companies').update({ name: input.empresa }).eq('id', contact.company_id);
         }
       }
 
-      const { error } = await (supabase.from('contacts').update({
+      const updatePayload: TablesUpdate<'contacts'> & Record<string, unknown> = {
         first_name: input.first_name,
         last_name: input.last_name,
         email: input.email,
@@ -148,7 +192,9 @@ export const useUpdateContact = () => {
         next_step: input.next_step ?? null,
         score_ai: input.score_ai ?? 0,
         updated_at: new Date().toISOString(),
-      }).eq('id', input.id) as any);
+      };
+
+      const { error } = await supabase.from('contacts').update(updatePayload).eq('id', input.id);
       if (error) throw error;
     },
     onSuccess: () => invalidateContactCaches(qc),
@@ -209,7 +255,7 @@ export const useCreateContact = () => {
         company_id = newCo.id;
       }
 
-      const { error } = await (supabase.from('contacts').insert({
+      const insertPayload: TablesInsert<'contacts'> & Record<string, unknown> = {
         company_id,
         first_name: input.first_name,
         last_name: input.last_name,
@@ -229,7 +275,9 @@ export const useCreateContact = () => {
         estado_certificacion: input.estado_certificacion || null,
         empleados_empresa: input.empleados_empresa || null,
         decision_maker: input.decision_maker ?? false,
-      }) as any);
+      };
+
+      const { error } = await supabase.from('contacts').insert(insertPayload);
       if (error) throw error;
     },
     onSuccess: () => invalidateContactCaches(qc),
