@@ -11,7 +11,12 @@ export const useEvents = () => {
         .select('*')
         .order('date', { ascending: true });
       if (error) throw error;
-      return (data || []) as unknown as ESGEvent[];
+      return (data || []).map((row) => ({
+        ...row,
+        date: row.date ?? '',
+        city: row.city ?? '',
+        attending: row.attending ?? false,
+      })) as ESGEvent[];
     },
   });
 };

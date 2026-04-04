@@ -12,12 +12,13 @@ import { Sparkles, Brain, Loader2, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Contact, Activity } from '@/types';
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  contact: any;
-  activities: any[];
+  contact: Contact;
+  activities: Activity[];
 }
 
 export const PrepararReunionDrawer = ({ open, onOpenChange, contact, activities }: Props) => {
@@ -37,11 +38,12 @@ export const PrepararReunionDrawer = ({ open, onOpenChange, contact, activities 
       
       setSummary(data.summary);
       toast({ title: 'Briefing generado con éxito' });
-    } catch (err: any) {
-      console.error('Error IA:', err);
+    } catch (err) {
+      const error = err as Error;
+      console.error('Error IA:', error);
       toast({ 
         title: 'Error al generar briefing', 
-        description: err.message || 'La IA está descansando, intenta de nuevo en un momento.',
+        description: error.message || 'La IA está descansando, intenta de nuevo en un momento.',
         variant: 'destructive' 
       });
     } finally {

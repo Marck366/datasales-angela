@@ -1,17 +1,30 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Activity } from '@/types';
+import { Activity, ActivityType, ContactStatus, Priority, UserRole } from '@/types';
+import { Tables } from '@/integrations/supabase/types';
 
-const mapActivity = (row: any): Activity => ({
+type ActivityRow = Tables<'activities'> & {
+  profiles: Tables<'profiles'> | null;
+  contacts?: (Tables<'contacts'> & { companies: Tables<'companies'> | null }) | null;
+};
+
+const mapActivity = (row: ActivityRow): Activity => ({
   id: row.id,
-  contact_id: row.contact_id,
-  type: row.type,
-  content: row.content,
-  old_value: row.old_value,
-  new_value: row.new_value,
-  created_by: row.created_by,
-  created_by_profile: row.profiles ? { id: row.profiles.id, name: row.profiles.name, email: row.profiles.email, role: row.profiles.role, avatar_color: row.profiles.avatar_color, created_at: row.profiles.created_at } : undefined,
-  created_at: row.created_at,
+  contact_id: row.contact_id || '',
+  type: (row.type as ActivityType) || 'nota',
+  content: row.content || undefined,
+  old_value: row.old_value || undefined,
+  new_value: row.new_value || undefined,
+  created_by: row.created_by || '',
+  created_by_profile: row.profiles ? { 
+    id: row.profiles.id, 
+    name: row.profiles.name, 
+    email: row.profiles.email, 
+    role: (row.profiles.role as UserRole) || 'comercial', 
+    avatar_color: row.profiles.avatar_color || 'gray', 
+    created_at: row.profiles.created_at || '' 
+  } : undefined,
+  created_at: row.created_at || '',
 });
 
 export const useActivities = (contactId?: string) => {
@@ -29,7 +42,7 @@ export const useActivities = (contactId?: string) => {
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data || []).map(mapActivity);
+      return (data as ActivityRow[] || []).map(mapActivity);
     },
   });
 };
@@ -37,24 +50,31 @@ export const useActivities = (contactId?: string) => {
 export const useAllActivities = () => {
   return useQuery({
     queryKey: ['activities', 'all'],
-    staleTime: 0,
-    refetchOnMount: true,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('activities')
         .select('*, profiles!activities_created_by_fkey(*), contacts(*, companies(*))')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return (data || []).map((row: any) => ({
+      
+      const rows = data as ActivityRow[];
+      return (rows || []).map((row) => ({
         ...mapActivity(row),
         contact: row.contacts ? {
           id: row.contacts.id,
           first_name: row.contacts.first_name,
           last_name: row.contacts.last_name,
-          company: row.contacts.companies,
-          status: row.contacts.status,
-          prioridad: row.contacts.prioridad,
-          seguimiento_date: row.contacts.seguimiento_date,
+          company: row.contacts.companies ? {
+            id: row.contacts.companies.id,
+            name: row.contacts.companies.name,
+            sector: row.contacts.companies.sector || undefined,
+            created_at: row.contacts.companies.created_at || ''
+          } : undefined,
+          status: (row.contacts.status as ContactStatus) || 'nuevo',
+          prioridad: (row.contacts.prioridad as Priority) || 'media',
+          seguimiento_date: row.contacts.seguimiento_date || undefined,
         } : undefined,
       }));
     },

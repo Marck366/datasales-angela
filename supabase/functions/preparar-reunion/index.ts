@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const ALLOWED_ORIGINS = [
   'https://datasales.angelaimpacteconomy.com',
+  'https://datasales-angela-git-dev-marck366s-projects.vercel.app',
   'http://localhost:8080',
   'http://localhost:5173',
 ];
@@ -23,13 +24,6 @@ Deno.serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  // Health check — sin datos sensibles
-  if (req.method === 'GET') {
-    return new Response(JSON.stringify({ status: 'ok' }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
   try {
     // 1. Validar autenticación
     const authHeader = req.headers.get('Authorization');
@@ -47,29 +41,55 @@ Deno.serve(async (req: Request) => {
     );
 
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-    
+
     if (authError || !user) {
-      console.error('Auth error:', authError);
-      return new Response(JSON.stringify({ error: 'Sesión inválida', details: 'Por favor, inicia sesión de nuevo.' }), {
+      return new Response(JSON.stringify({
+        error: 'Sesión inválida',
+        details: authError?.message || 'No se pudo verificar la sesión del usuario.'
+      }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // 2. Cargar API Key de Anthropic
+    // 2. Validar que el usuario tiene acceso al contacto solicitado
+    const { contact, activities } = await req.json();
+
+    if (!contact?.id) {
+      return new Response(JSON.stringify({ error: 'Falta el ID del contacto.' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: contactRow, error: contactError } = await supabaseClient
+      .from('contacts')
+      .select('id, assigned_to')
+      .eq('id', contact.id)
+      .single();
+
+    if (contactError || !contactRow) {
+      return new Response(JSON.stringify({ error: 'Contacto no encontrado.' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // La verificación de acceso la hace RLS automáticamente —
+    // si la query devolvió el contacto, el usuario tiene acceso.
+
+    // 3. Cargar API Key de Anthropic
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-    
+
     if (!ANTHROPIC_API_KEY) {
-      return new Response(JSON.stringify({ 
-        error: 'Configuración incompleta', 
+      return new Response(JSON.stringify({
+        error: 'Configuración incompleta',
         details: 'ANTHROPIC_API_KEY no encontrada en los secrets de Supabase.'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    const { contact, activities } = await req.json();
 
     // Construir resumen del historial para el prompt
     const historial = activities
@@ -85,7 +105,7 @@ Deno.serve(async (req: Request) => {
     const prompt = `Eres el asistente comercial de Ângela Impact Economy, consultora ESG española (B Corp, CSRD, huella de carbono).
 
 DATOS DEL CONTACTO:
-- Empresa: ${contact.company_name ?? 'desconocida'}
+- Empresa: ${contact.company?.name ?? contact.company_name ?? 'desconocida'}
 - Contacto: ${contact.first_name} ${contact.last_name}
 - Estado actual: ${contact.status}
 - Prioridad: ${contact.prioridad}
@@ -121,7 +141,7 @@ Sé directo, práctico y breve.`;
     if (!response.ok) {
       console.error('Anthropic error:', response.status, JSON.stringify(data));
       return new Response(JSON.stringify({
-        error: 'Error al generar el brief. Inténtalo de nuevo.',
+        error: data?.error?.message || 'Error al generar el brief. Inténtalo de nuevo.',
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -137,7 +157,7 @@ Sé directo, práctico y breve.`;
   } catch (error: any) {
     console.error('Function error:', error.message);
     return new Response(JSON.stringify({
-      error: 'Error interno. Inténtalo de nuevo.',
+      error: 'Error interno. ' + error.message,
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

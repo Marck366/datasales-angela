@@ -85,7 +85,7 @@ export const RegistrarContactoModal = ({ open, onOpenChange, contact }: Props) =
       // 1. Create communication activity
       await createActivity.mutateAsync({
         contact_id: contact.id,
-        type: type as any,
+        type: type as any, // Activity type from fixed contactTypes
         content: `${typeLabel} realizada${notes ? `: ${notes}` : ''}`,
         created_by: profile.id,
       });
@@ -104,11 +104,9 @@ export const RegistrarContactoModal = ({ open, onOpenChange, contact }: Props) =
 
       // 3. Update contact (status, follow-up)
       const seguimiento = calcSeguimientoDate(type);
-      const updateData: any = { 
+      const updateData: Record<string, string | number | boolean | null> = { 
         status: newStatus,
         seguimiento_date: seguimiento, 
-        // We're omitting next_step for now because it's missing from the DB schema
-        // next_step: nextStep || null,
         updated_at: new Date().toISOString() 
       };
 
@@ -122,7 +120,6 @@ export const RegistrarContactoModal = ({ open, onOpenChange, contact }: Props) =
         .eq('id', contact.id);
 
       if (updateError) {
-        console.error('Error al actualizar contacto:', updateError);
         throw new Error(`DB Update Error: ${updateError.message}`);
       }
 
@@ -133,11 +130,11 @@ export const RegistrarContactoModal = ({ open, onOpenChange, contact }: Props) =
       });
       
       onOpenChange(false);
-    } catch (err: any) {
-      console.error('Captura de error en RegistrarContactoModal:', err);
+    } catch (err) {
+      const error = err as Error;
       toast({ 
         title: '❌ Error al registrar', 
-        description: err.message || 'Verifica tu conexión o permisos de acceso.',
+        description: error.message || 'Verifica tu conexión o permisos de acceso.',
         variant: 'destructive' 
       });
     }
