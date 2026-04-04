@@ -3,21 +3,18 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const rawKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
-// Forzamos el uso de la clave nueva si la detectada no tiene el prefijo correcto
-const SUPABASE_PUBLISHABLE_KEY = rawKey?.startsWith('eyJ') ? rawKey : "REMOVED";
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Blindaje contra variables ausentes para evitar el "pantallazo blanco" crítico
 if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-  console.warn("⚠️ Advertencia: Faltan variables de entorno de Supabase. La aplicación podría no funcionar correctamente.");
+  console.error("❌ Faltan variables de entorno VITE_SUPABASE_URL y/o VITE_SUPABASE_PUBLISHABLE_KEY.");
 }
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(
-  SUPABASE_URL || "https://REMOVED.supabase.co", 
-  SUPABASE_PUBLISHABLE_KEY || "placeholder-key", 
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY,
   {
     auth: {
       storage: localStorage,
