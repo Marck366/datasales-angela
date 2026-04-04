@@ -22,11 +22,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single();
+    if (error) {
+      console.error('Error cargando perfil de usuario:', error.message);
+      return;
+    }
     if (data) {
       setProfile(data as unknown as Profile);
     }

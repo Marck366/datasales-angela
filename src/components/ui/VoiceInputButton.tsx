@@ -100,7 +100,14 @@ export const VoiceInputButton = ({ onTranscript, className, size = 'md' }: Voice
     recognitionRef.current = recognition;
 
     return () => {
-      if (recognitionRef.current) recognitionRef.current.abort();
+      if (recognitionRef.current) {
+        recognitionRef.current.onstart = null;
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.abort();
+        recognitionRef.current = null;
+      }
     };
   }, [onTranscript]);
 
