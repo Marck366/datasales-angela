@@ -16,7 +16,7 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(
-  SUPABASE_URL || "https://placeholder-url.supabase.co", 
+  SUPABASE_URL || "https://REMOVED.supabase.co", 
   SUPABASE_PUBLISHABLE_KEY || "placeholder-key", 
   {
     auth: {
