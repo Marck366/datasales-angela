@@ -41,31 +41,55 @@ Deno.serve(async (req: Request) => {
     );
 
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-    
+
     if (authError || !user) {
-      return new Response(JSON.stringify({ 
-        error: 'Sesión inválida', 
-        details: authError?.message || 'No se pudo verificar la sesión del usuario.' 
+      return new Response(JSON.stringify({
+        error: 'Sesión inválida',
+        details: authError?.message || 'No se pudo verificar la sesión del usuario.'
       }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // 2. Cargar API Key de Anthropic
+    // 2. Validar que el usuario tiene acceso al contacto solicitado
+    const { contact, activities } = await req.json();
+
+    if (!contact?.id) {
+      return new Response(JSON.stringify({ error: 'Falta el ID del contacto.' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: contactRow, error: contactError } = await supabaseClient
+      .from('contacts')
+      .select('id, assigned_to')
+      .eq('id', contact.id)
+      .single();
+
+    if (contactError || !contactRow) {
+      return new Response(JSON.stringify({ error: 'Contacto no encontrado.' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // La verificación de acceso la hace RLS automáticamente —
+    // si la query devolvió el contacto, el usuario tiene acceso.
+
+    // 3. Cargar API Key de Anthropic
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-    
+
     if (!ANTHROPIC_API_KEY) {
-      return new Response(JSON.stringify({ 
-        error: 'Configuración incompleta', 
+      return new Response(JSON.stringify({
+        error: 'Configuración incompleta',
         details: 'ANTHROPIC_API_KEY no encontrada en los secrets de Supabase.'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    const { contact, activities } = await req.json();
 
     // Construir resumen del historial para el prompt
     const historial = activities
