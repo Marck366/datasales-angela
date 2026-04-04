@@ -1,15 +1,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const ALLOWED_ORIGINS = [
-  'https://datasales.angelaimpacteconomy.com',
-  'https://datasales-angela-git-dev-marck366s-projects.vercel.app',
-  'http://localhost:8080',
-  'http://localhost:5173',
-];
+const isAllowedOrigin = (origin: string): boolean => {
+  if (!origin) return false;
+  if (origin === 'https://datasales.angelaimpacteconomy.com') return true;
+  if (origin.startsWith('http://localhost:')) return true;
+  if (origin.endsWith('.vercel.app')) return true;
+  return false;
+};
 
 const getCorsHeaders = (req: Request) => {
   const origin = req.headers.get('origin') ?? '';
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const allowedOrigin = isAllowedOrigin(origin) ? origin : 'https://datasales.angelaimpacteconomy.com';
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
