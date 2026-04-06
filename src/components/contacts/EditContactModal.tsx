@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { Contact, ContactStatus, PipelineType } from '@/types';
 import { useUpdateContact } from '@/hooks/useContacts';
@@ -84,6 +84,31 @@ export const EditContactModal = ({ open, onOpenChange, contact }: EditContactMod
       }
     }
   }, [contact, open]);
+
+  const initialFormSnapshot = useMemo(() => {
+    if (!contact) return '';
+    return JSON.stringify({
+      empresa: contact.company?.name || '',
+      first_name: contact.first_name,
+      last_name: contact.last_name,
+      email: contact.email || '',
+      phone: contact.phone || '',
+      tipo: contact.tipo || 'Cliente',
+      prioridad: contact.prioridad || 'media',
+      valor_potencial: contact.valor_potencial?.toString() || '',
+      probabilidad_cierre: contact.probabilidad_cierre?.toString() || '',
+      fecha_cierre_probable: contact.fecha_cierre_probable || '',
+      servicio_interes: contact.servicio_interes || '',
+      estado_certificacion: contact.estado_certificacion || '',
+      empleados_empresa: contact.empleados_empresa || '',
+      decision_maker: contact.decision_maker ?? false,
+      next_step: contact.next_step || '',
+      pipeline: contact.pipeline || 'captura',
+      status: contact.status || 'nuevo',
+    });
+  }, [contact]);
+
+  const isDirty = open && JSON.stringify(form) !== initialFormSnapshot;
 
   const handleSave = async () => {
     if (!form.first_name || !form.last_name) {
@@ -379,19 +404,24 @@ export const EditContactModal = ({ open, onOpenChange, contact }: EditContactMod
           </section>
         </div>
 
-        <div className="p-8 bg-slate-50/50 border-t border-slate-100 flex gap-4">
-          <button 
+        <div className="sticky bottom-0 p-8 bg-white dark:bg-[#001a2d] border-t border-slate-100 dark:border-white/10 flex gap-4">
+          <button
             onClick={() => onOpenChange(false)}
-            className="flex-1 py-5 bg-white border border-slate-200 text-slate-400 font-heading font-black rounded-2xl hover:bg-slate-50 transition-all uppercase tracking-[0.2em] text-[10px]"
+            className="flex-1 py-5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-400 font-heading font-black rounded-2xl hover:bg-slate-50 dark:hover:bg-white/10 transition-all uppercase tracking-[0.2em] text-[10px]"
           >
-            Frenar Cambios
+            Cancelar
           </button>
-          <button 
-            onClick={handleSave} 
-            disabled={updateContact.isPending} 
-            className="flex-[2] py-5 bg-[#002B49] text-white font-heading font-black rounded-2xl shadow-xl shadow-[#002B49]/20 hover:shadow-2xl hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-50 uppercase tracking-[0.2em] text-[10px]"
+          <button
+            onClick={handleSave}
+            disabled={updateContact.isPending || !isDirty}
+            className={cn(
+              "flex-[2] py-5 bg-[#002B49] text-white font-heading font-black rounded-2xl hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-50 uppercase tracking-[0.2em] text-[10px]",
+              isDirty
+                ? "shadow-2xl shadow-[#00AEEF]/30 animate-pulse-subtle"
+                : "shadow-xl shadow-[#002B49]/20"
+            )}
           >
-            {updateContact.isPending ? 'Sincronizando...' : 'Actualizar Asset Permanente'}
+            {updateContact.isPending ? 'Guardando...' : isDirty ? 'Guardar Cambios' : 'Sin cambios'}
           </button>
         </div>
       </DialogContent>

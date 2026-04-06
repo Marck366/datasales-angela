@@ -147,7 +147,7 @@ export const RegistrarContactoModal = ({ open, onOpenChange, contact }: Props) =
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent hideClose className="w-[92%] max-h-[92svh] sm:max-w-2xl rounded-[2.5rem] sm:rounded-[3rem] overflow-hidden p-0 border-none shadow-2xl bg-white focus:outline-none">
+      <DialogContent hideClose className="w-[92%] max-h-[92svh] sm:max-w-2xl rounded-[2.5rem] sm:rounded-[3rem] overflow-hidden p-0 border-none shadow-2xl bg-white focus:outline-none flex flex-col">
         <div className="bg-[#002B49] p-8 text-white relative">
           <DialogClose className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-all z-50">
             <X className="w-4 h-4" />
@@ -161,7 +161,7 @@ export const RegistrarContactoModal = ({ open, onOpenChange, contact }: Props) =
           </DialogHeader>
         </div>
 
-        <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto">
+        <div className="p-8 space-y-8 flex-1 overflow-y-auto min-h-0">
           {/* TIPO DE CONTACTO */}
           <div>
             <label className={labelClass}>¿Cómo ha sido el contacto?</label>

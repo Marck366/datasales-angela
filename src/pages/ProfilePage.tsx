@@ -1,12 +1,14 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useContacts } from '@/hooks/useContacts';
 import { useAllActivities } from '@/hooks/useActivities';
+import { cn } from '@/lib/utils';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Activity } from '@/types';
 import { motion } from 'framer-motion';
 import { LogOut, TrendingUp, Target, Briefcase, Activity as ActivityIcon, ChevronLeft } from 'lucide-react';
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Phone, Mail, MessageSquare, Handshake } from 'lucide-react';
 
 const ProfilePage = () => {
   const { profile, user, signOut } = useAuth();
@@ -46,6 +48,18 @@ const ProfilePage = () => {
 
     return { total, cerrados, winRate, carteraActiva, valorGanado };
   }, [myContacts]);
+
+  const effortMetrics = useMemo(() => {
+    if (!user) return { llamadas: 0, emails: 0, whatsapp: 0, reuniones: 0 };
+    const myActs = (allActivities as Activity[]).filter(a => a.created_by === user.id);
+    
+    return {
+      llamadas: myActs.filter(a => a.type === 'llamada').length,
+      emails: myActs.filter(a => a.type === 'email').length,
+      whatsapp: myActs.filter(a => a.type === 'whatsapp').length,
+      reuniones: myActs.filter(a => ['reunion', 'videoconferencia', 'presencial', 'telematica'].includes(a.type || '')).length,
+    };
+  }, [allActivities, user]);
 
   const fmtValor = (v: number) => {
     if (!v) return '0 €';
@@ -140,6 +154,39 @@ const ProfilePage = () => {
             </span>
           </motion.div>
         </div>
+
+        {/* Métricas de Esfuerzo */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.22 }}
+          className="mb-10"
+        >
+          <div className="flex items-center gap-2 mb-4 px-1">
+            <ActivityIcon className="w-4 h-4 text-sky" />
+            <h2 className="font-heading font-bold text-lg text-foreground">Tu Esfuerzo Comercial</h2>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: 'Llamadas', count: effortMetrics.llamadas, icon: <Phone className="w-5 h-5" />, color: 'text-sky', bg: 'bg-sky/10' },
+              { label: 'Emails', count: effortMetrics.emails, icon: <Mail className="w-5 h-5" />, color: 'text-indigo-500', bg: 'bg-indigo-500/10' },
+              { label: 'WhatsApp', count: effortMetrics.whatsapp, icon: <MessageSquare className="w-5 h-5" />, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+              { label: 'Reuniones', count: effortMetrics.reuniones, icon: <Handshake className="w-5 h-5" />, color: 'text-orange-500', bg: 'bg-orange-500/10' },
+            ].map((m, idx) => (
+              <div 
+                key={m.label} 
+                className="glass rounded-[2rem] p-5 border border-border flex flex-col items-center justify-center text-center group hover:border-primary/20 transition-all"
+              >
+                <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center mb-3 shadow-inner transition-transform group-hover:scale-110", m.bg, m.color)}>
+                  {m.icon}
+                </div>
+                <span className="text-2xl font-heading font-black text-foreground tabular-nums leading-none mb-1.5">{m.count}</span>
+                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{m.label}</span>
+              </div>
+            ))}
+          </div>
+        </motion.section>
 
         {/* Última Actividad */}
         <motion.div
