@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,6 +17,13 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /* ── RPC hooks ── */
 interface RankingEntry {
@@ -57,6 +64,44 @@ type SortKey = 'empresa' | 'tipo' | 'contacto' | 'responsable' | 'semana' | 'est
 type SortDir = 'asc' | 'desc';
 
 /* ── Sub-components ── */
+const BoardCard = ({ c, latestActivity }: { c: Contact; latestActivity?: Activity }) => {
+  return (
+    <div className="bg-card border border-border rounded-3xl p-5 shadow-sm hover:shadow-md transition-all hover:border-primary/20 group">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1 min-w-0">
+          <p className="font-heading font-black text-sm text-foreground truncate group-hover:text-primary transition-colors uppercase tracking-tight">
+            {c.company?.name || `${c.first_name}`}
+          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black text-white shrink-0 shadow-sm" style={{ backgroundColor: `#${c.assigned_profile?.avatar_color || 'ccc'}` }}>
+              {c.assigned_profile?.name?.[0] || '?'}
+            </div>
+            <p className="text-[10px] text-muted-foreground font-bold truncate tracking-widest uppercase">
+              {c.assigned_profile?.name?.split(' ')[0]}
+            </p>
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <span className="text-xs font-black text-sky tabular-nums">
+            {c.valor_potencial ? `${Math.round(c.valor_potencial / 1000)}k €` : '—'}
+          </span>
+        </div>
+      </div>
+      
+      {latestActivity && (
+        <div className="mt-3 p-3 bg-muted/40 rounded-2xl border border-border/50 relative overflow-hidden group-hover:bg-muted/60 transition-colors">
+          <p className="text-[10px] text-foreground font-medium line-clamp-3 leading-relaxed italic">
+            "{latestActivity.content || 'Sin comentarios registrados'}"
+          </p>
+          <p className="text-[8px] text-muted-foreground font-bold mt-2 uppercase tracking-tighter opacity-60">
+            {new Date(latestActivity.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const MeetingRow = ({ c }: { c: Contact }) => {
   const mt = meetingTypeIcons[c.meeting_type || ''] || meetingTypeIcons.llamada;
   return (
@@ -81,7 +126,17 @@ const DashboardPage = () => {
   const { data: activities = [] } = useAllActivities();
 
   const { profile } = useAuth();
-  const [activeTab, setActiveTab] = useState(0);
+  
+  /* ── Desktop Detection ── */
+  const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : false);
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const [activeTab, setActiveTab] = useState(isDesktop ? 'Comité' : 'Pipeline');
 
   // Tab: Hoy — state
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
@@ -95,6 +150,7 @@ const DashboardPage = () => {
   const [sortKey, setSortKey] = useState<SortKey>('empresa');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [commercialBoardFilter, setCommercialBoardFilter] = useState<string>('todos');
 
   /* ── Derived data (Pipeline-aware) ── */
   const pipelineContacts = useMemo(() => contacts.filter(c => c.pipeline === activePipeline), [contacts, activePipeline]);
@@ -102,19 +158,27 @@ const DashboardPage = () => {
   const stats = useMemo(() => {
     return {
       total: pipelineContacts.length,
-      nuevo: pipelineContacts.filter(c => c.status === 'nuevo' || c.status === 'propuesta_solicitada').length,
-      agendado: pipelineContacts.filter(c => c.status === 'agendado' || c.status === 'propuesta_entregada').length,
-      pendiente_propuesta: pipelineContacts.filter(c => c.status === 'pendiente_propuesta' || c.status === 'aceptada').length,
-      propuesta_mandada: pipelineContacts.filter(c => c.status === 'propuesta_mandada' || c.status === 'prevision_cierre').length,
+      // Captura
+      nuevo: pipelineContacts.filter(c => c.status === 'nuevo').length,
+      agendado: pipelineContacts.filter(c => c.status === 'agendado').length,
+      pendiente_propuesta: pipelineContacts.filter(c => c.status === 'pendiente_propuesta').length,
+      propuesta_mandada: pipelineContacts.filter(c => c.status === 'propuesta_mandada').length,
       cerrado: pipelineContacts.filter(c => c.status === 'cerrado').length,
-      perdido: pipelineContacts.filter(c => c.status === 'perdido' || c.status === 'rechazada').length,
+      perdido: pipelineContacts.filter(c => c.status === 'perdido').length,
+      // Cartera
+      propuesta_solicitada: pipelineContacts.filter(c => c.status === 'propuesta_solicitada').length,
+      propuesta_entregada: pipelineContacts.filter(c => c.status === 'propuesta_entregada').length,
+      aceptada: pipelineContacts.filter(c => c.status === 'aceptada').length,
+      prevision_cierre: pipelineContacts.filter(c => c.status === 'prevision_cierre').length,
+      rechazada: pipelineContacts.filter(c => c.status === 'rechazada').length,
     };
   }, [pipelineContacts]);
 
   const today = toDateStr(new Date());
   const endOfWeek = toDateStr(getEndOfWeek(new Date()));
   const total = stats.total;
-  const conversionRate = total > 0 ? ((stats.cerrado / total) * 100).toFixed(1) : '0';
+  const totalCerrado = stats.cerrado + stats.aceptada;
+  const conversionRate = total > 0 ? ((totalCerrado / total) * 100).toFixed(1) : '0';
 
   const pipelineValor = useMemo(() => {
     const map: Record<string, number> = {};
@@ -146,7 +210,8 @@ const DashboardPage = () => {
   }, [pipelineContacts]);
 
   const fmtValor = (v: number) => {
-    if (!v) return '—';
+    if (v === 0) return '0 €';
+    if (!v) return '0 €';
     if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1).replace('.', ',')}M €`;
     if (v >= 1_000) return `${Math.round(v / 1_000)}k €`;
     return `${v.toLocaleString('es-ES')} €`;
@@ -170,11 +235,11 @@ const DashboardPage = () => {
       ];
     } else {
       return [
-        { key: 'propuesta_solicitada', label: 'P. Solicitada', value: stats.nuevo, fg: 'text-sky-700 dark:text-sky-400', gradient: 'from-sky-500/20 to-transparent', filter: 'propuesta_solicitada' },
-        { key: 'propuesta_entregada', label: 'P. Entregada', value: stats.agendado, fg: 'text-orange-700 dark:text-orange-400', gradient: 'from-orange-500/20 to-transparent', filter: 'propuesta_entregada' },
-        { key: 'aceptada', label: 'Aceptadas', value: stats.pendiente_propuesta, fg: 'text-emerald-700 dark:text-emerald-400', gradient: 'from-emerald-500/20 to-transparent', filter: 'aceptada' },
-        { key: 'prevision_cierre', label: 'Previsión', value: stats.propuesta_mandada, fg: 'text-sky-700 dark:text-sky-400', gradient: 'from-sky-500/20 to-transparent', filter: 'prevision_cierre' },
-        { key: 'rechazada', label: 'Rechazadas', value: stats.perdido, fg: 'text-rose-700 dark:text-rose-400', gradient: 'from-rose-500/20 to-transparent', filter: 'rechazada' },
+        { key: 'aceptada', label: 'Aceptadas', value: stats.aceptada, fg: 'text-emerald-700 dark:text-emerald-400', gradient: 'from-emerald-500/20 to-transparent', filter: 'aceptada', big: true },
+        { key: 'prevision_cierre', label: 'Previsión', value: stats.prevision_cierre, fg: 'text-orange-700 dark:text-orange-400', gradient: 'from-orange-500/20 to-transparent', filter: 'prevision_cierre', big: true },
+        { key: 'propuesta_solicitada', label: 'P. Solicitada', value: stats.propuesta_solicitada, fg: 'text-slate-700 dark:text-slate-400', gradient: 'from-slate-500/20 to-transparent', filter: 'propuesta_solicitada' },
+        { key: 'propuesta_entregada', label: 'P. Entregada', value: stats.propuesta_entregada, fg: 'text-blue-700 dark:text-blue-400', gradient: 'from-blue-500/20 to-transparent', filter: 'propuesta_entregada' },
+        { key: 'rechazada', label: 'Rechazadas', value: stats.rechazada, fg: 'text-rose-700 dark:text-rose-400', gradient: 'from-rose-500/20 to-transparent', filter: 'rechazada' },
       ];
     }
   }, [stats, activePipeline]);
@@ -205,20 +270,44 @@ const DashboardPage = () => {
 
   const pendingContacts = useMemo(() => {
     const results: { contact: Contact; reason: string; urgencyScore: number }[] = [];
+    const dayMs = 86400000;
+    const now = Date.now();
+
     pipelineContacts.forEach(c => {
+      // 1. Seguimiento manual vencido
       if (c.seguimiento_date && c.seguimiento_date <= today) {
-        const d = Math.floor((Date.now() - new Date(c.seguimiento_date + 'T00:00:00').getTime()) / 86400000);
+        const d = Math.floor((now - new Date(c.seguimiento_date + 'T00:00:00').getTime()) / dayMs);
         results.push({ contact: c, reason: `Seguimiento vencido (${d}d)`, urgencyScore: 100 + d });
       }
-      if (c.status === 'agendado' && c.scheduled_date && c.scheduled_date < today) {
-        const d = Math.floor((Date.now() - new Date(c.scheduled_date + 'T00:00:00').getTime()) / 86400000);
-        results.push({ contact: c, reason: `Reunión pasada sin cerrar (${d}d)`, urgencyScore: 90 + d });
+
+      // 2. Agendado y han pasado 10 días desde la fecha de reunión
+      if (c.status === 'agendado' && c.scheduled_date) {
+        const d = Math.floor((now - new Date(c.scheduled_date + 'T00:00:00').getTime()) / dayMs);
+        if (d > 10) {
+          results.push({ contact: c, reason: `Reunión +10d sin cambio`, urgencyScore: 90 + d });
+        }
       }
+
+      // 3. Propuesta mandada/entregada y 14 días sin actividad
+      if (['propuesta_mandada', 'propuesta_entregada'].includes(c.status)) {
+        const acts = (activities as Activity[]).filter(a => a.contact_id === c.id);
+        const latest = acts.length > 0 
+          ? [...acts].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]?.created_at 
+          : c.updated_at;
+        const d = Math.floor((now - new Date(latest).getTime()) / dayMs);
+        if (d >= 14) {
+          results.push({ contact: c, reason: `Propuesta +14d sin rpta`, urgencyScore: 80 + d });
+        }
+      }
+
+      // 4. Prospectos fríos (Sin contacto por 7 días)
       if (c.status === 'nuevo' || c.status === 'propuesta_solicitada') {
         const acts = (activities as Activity[]).filter(a => a.contact_id === c.id);
-        const latest = acts.length > 0 ? [...acts].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]?.created_at : c.created_at;
-        const d = Math.floor((Date.now() - new Date(latest).getTime()) / 86400000);
-        if (d >= 7) results.push({ contact: c, reason: `Sin contacto hace ${d} días`, urgencyScore: 50 + d });
+        const latest = acts.length > 0 
+          ? [...acts].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]?.created_at 
+          : c.created_at;
+        const d = Math.floor((now - new Date(latest).getTime()) / dayMs);
+        if (d >= 7) results.push({ contact: c, reason: `Sin contacto hace ${d}d`, urgencyScore: 50 + d });
       }
     });
 
@@ -230,12 +319,24 @@ const DashboardPage = () => {
     return Array.from(map.values()).sort((a, b) => b.urgencyScore - a.urgencyScore);
   }, [pipelineContacts, activities, today]);
 
-  const funnelStages = [
-    { label: 'Nuevos',    count: stats?.nuevo    ?? 0, color: 'bg-[#002B49]', valor: pipelineValor['nuevo']    ?? 0 },
-    { label: 'Agendados', count: stats?.agendado ?? 0, color: 'bg-[#005A92]', valor: pipelineValor['agendado'] ?? 0 },
-    { label: 'Cerrados',  count: stats?.cerrado  ?? 0, color: 'bg-emerald-600', valor: pipelineValor['cerrado']  ?? 0 },
-    { label: 'Perdidos',  count: stats?.perdido  ?? 0, color: 'bg-rose-600', valor: pipelineValor['perdido']  ?? 0 },
-  ];
+  const funnelStages = useMemo(() => {
+    if (activePipeline === 'captura') {
+      return [
+        { label: 'NUEVOS',    count: stats?.nuevo    ?? 0, color: 'bg-sky-600 dark:bg-[#002B49]', valor: pipelineValor['nuevo']    ?? 0 },
+        { label: 'AGENDADOS', count: stats?.agendado ?? 0, color: 'bg-[#005A92]', valor: pipelineValor['agendado'] ?? 0 },
+        { label: 'CERRADOS',  count: stats?.cerrado  ?? 0, color: 'bg-emerald-600', valor: pipelineValor['cerrado']  ?? 0 },
+        { label: 'PERDIDOS',  count: stats?.perdido  ?? 0, color: 'bg-rose-600', valor: pipelineValor['perdido']  ?? 0 },
+      ];
+    } else {
+      return [
+        { label: 'SOLICITADA', count: stats?.propuesta_solicitada ?? 0, color: 'bg-indigo-600', valor: pipelineValor['propuesta_solicitada'] ?? 0 },
+        { label: 'ENTREGADA',  count: stats?.propuesta_entregada  ?? 0, color: 'bg-sky-600',    valor: pipelineValor['propuesta_entregada']  ?? 0 },
+        { label: 'ACEPTADA',   count: stats?.aceptada            ?? 0, color: 'bg-emerald-600', valor: pipelineValor['aceptada']            ?? 0 },
+        { label: 'RECHAZADA',  count: stats?.rechazada           ?? 0, color: 'bg-rose-600',    valor: pipelineValor['rechazada']           ?? 0 },
+      ];
+    }
+  }, [activePipeline, stats, pipelineValor]);
+
   const maxFunnel = Math.max(...funnelStages.map(s => s.count), 1);
 
   const campaignSegments = useMemo(() => {
@@ -319,11 +420,50 @@ const DashboardPage = () => {
     </th>
   );
 
-  const tabs = [
-    { label: 'Hoy', icon: <Sun className="w-3.5 h-3.5" />, badge: pendingContacts.length },
-    { label: 'Pipeline', icon: <TrendingUp className="w-3.5 h-3.5" />, badge: 0 },
-    { label: 'Equipo', icon: <Users className="w-3.5 h-3.5" />, badge: 0 },
-  ];
+  const tabs = useMemo(() => {
+    const base = [
+      { id: 'Pipeline', label: 'Pipeline', icon: <TrendingUp className="w-3.5 h-3.5" />, badge: 0 },
+      { id: 'Equipo', label: 'Equipo', icon: <Users className="w-3.5 h-3.5" />, badge: 0 },
+    ];
+    if (isDesktop) {
+      return [
+        { id: 'Comité', label: 'Comité', icon: <Sun className="w-3.5 h-3.5" />, badge: pendingContacts.length },
+        ...base
+      ];
+    }
+    return base;
+  }, [isDesktop, pendingContacts.length]);
+
+  /* ── Board Stages ── */
+  const boardColumns = useMemo(() => {
+    if (activePipeline === 'captura') {
+      return [
+        { id: 'nuevo', label: 'Nuevos', color: 'bg-indigo-500' },
+        { id: 'agendado', label: 'Agendados', color: 'bg-orange-500' },
+        { id: 'pendiente_propuesta', label: 'P. Propuesta', color: 'bg-sky-500' },
+        { id: 'propuesta_mandada', label: 'P. Mandada', color: 'bg-blue-600' },
+        { id: 'cerrado', label: 'Cerrados', color: 'bg-emerald-500' },
+        { id: 'perdido', label: 'Perdidos', color: 'bg-rose-500' },
+      ];
+    } else {
+      return [
+        { id: 'propuesta_solicitada', label: 'P. Solicitada', color: 'bg-indigo-500' },
+        { id: 'propuesta_entregada', label: 'P. Entregada', color: 'bg-blue-600' },
+        { id: 'aceptada', label: 'Aceptadas', color: 'bg-emerald-500' },
+        { id: 'prevision_cierre', label: 'Previsión', color: 'bg-orange-500' },
+        { id: 'rechazada', label: 'Rechazadas', color: 'bg-rose-500' },
+      ];
+    }
+  }, [activePipeline]);
+
+  const latestActivitiesMap = useMemo(() => {
+    const map: Record<string, Activity> = {};
+    const sorted = [...(activities as Activity[])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    sorted.forEach(a => {
+      if (!map[a.contact_id]) map[a.contact_id] = a;
+    });
+    return map;
+  }, [activities]);
 
   return (
     <AppLayout>
@@ -368,13 +508,13 @@ const DashboardPage = () => {
         {/* ─── Sticky tab strip ─── */}
         <div className="sticky top-[64px] z-30 bg-background/80 backdrop-blur-2xl border-b border-border px-5 py-3">
           <div className="flex gap-1 bg-card border border-border rounded-2xl p-1 shadow-sm">
-            {tabs.map((tab, i) => (
+            {tabs.map((tab) => (
               <button
-                key={tab.label}
-                onClick={() => setActiveTab(i)}
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
                 className="relative flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
               >
-                {activeTab === i && (
+                {activeTab === tab.id && (
                   <motion.div
                     layoutId="tab-indicator-dash"
                     className="absolute inset-0 bg-muted rounded-xl"
@@ -383,7 +523,7 @@ const DashboardPage = () => {
                 )}
                 <span className={cn(
                   "relative z-10 flex items-center gap-2",
-                  activeTab === i ? "text-foreground" : "text-muted-foreground"
+                  activeTab === tab.id ? "text-foreground" : "text-muted-foreground"
                 )}>
                   {tab.icon}
                   {tab.label}
@@ -409,91 +549,126 @@ const DashboardPage = () => {
             className="px-5 pt-6 pb-24 space-y-8"
           >
 
-            {/* ══════════ TAB 0: HOY ══════════ */}
-            {activeTab === 0 && (
-              <>
-                {/* KPI cards */}
-                <section className="space-y-4">
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {kpis.map(k => (
-                      <button
-                        key={k.key}
-                        onClick={() => !contactsLoading && setActiveFilter(f => f === k.filter ? null : k.filter)}
-                        className={cn(
-                          "relative overflow-hidden glass rounded-[2.5rem] p-5 text-center transition-all duration-500",
-                          activeFilter === k.filter
-                            ? cn("scale-[1.05] z-20 shadow-2xl ring-2 bg-slate-50 dark:bg-white/10 ring-inset", k.gradient, "ring-slate-200 dark:ring-white/20")
-                            : "hover:scale-[1.02] hover:shadow-xl hover:border-slate-200 dark:hover:border-white/20"
-                        )}
-                      >
-                        <span className={cn("text-3xl font-heading font-black tabular-nums block leading-none mb-2 tracking-tighter", k.fg)}>{contactsLoading ? '—' : k.value}</span>
-                        <span className="text-[10px] font-black uppercase tracking-widest block text-[#002B49] dark:text-white/90">{k.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => !contactsLoading && setActiveFilter(f => f === 'total' ? null : 'total')}
-                    className={cn(
-                      "w-full glass rounded-[2.5rem] p-5 text-center transition-all duration-500",
-                      activeFilter === 'total'
-                        ? "scale-[1.05] z-20 shadow-2xl ring-1 ring-white/20 bg-white/10"
-                        : "hover:scale-[1.02] hover:bg-white/10"
-                    )}
-                  >
-                    <div className="flex items-center justify-center gap-3">
-                      <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Total en {activePipeline.toUpperCase()}:</span>
-                      <span className="text-xl font-heading font-black text-foreground tabular-nums tracking-tighter">{total}</span>
+            {/* ══════════ TAB 0: COMITÉ ══════════ */}
+            {activeTab === 'Comité' && isDesktop && (
+              <div className="space-y-8">
+                {/* Selector de Comercial para el Comité */}
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between bg-card border border-border p-5 rounded-[2.5rem] shadow-sm gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                      <Users className="w-6 h-6" />
                     </div>
-                  </button>
-                </section>
-
-                {/* KPI Drill-down */}
-                <AnimatePresence>
-                  {activeFilter && (
-                    <motion.section
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="space-y-4"
-                    >
-                      <div className="flex items-center justify-between px-2">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground">
-                          Auditando: {activeFilter.toUpperCase().replace('_', ' ')} ({filteredContacts.length})
-                        </h3>
-                        <div className="flex gap-2">
-                          {(['todos', 'Cliente', 'Partner'] as const).map(t => (
-                            <button
-                              key={t}
-                              onClick={() => setTipoFilter(tipoFilter === t ? 'todos' : t)}
-                              className={cn(
-                                "px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
-                                tipoFilter === t ? "bg-primary text-white shadow-md" : "bg-white/5 text-white/60 border border-white/10 hover:bg-white/10 hover:text-white"
-                              )}
+                    <div>
+                      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-0.5">Filtro de Equipo</h3>
+                      <p className="text-sm font-black text-foreground uppercase tracking-tight">Comité de Dirección</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
+                    <div className="flex items-center gap-3 bg-muted/50 p-1.5 pl-4 rounded-2xl border border-border w-full md:w-64">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground whitespace-nowrap">Comercial:</span>
+                      <Select 
+                        value={commercialBoardFilter} 
+                        onValueChange={setCommercialBoardFilter}
+                      >
+                        <SelectTrigger className="bg-transparent border-none shadow-none h-8 text-[11px] font-black uppercase tracking-widest focus:ring-0">
+                          <SelectValue placeholder="Seleccionar comercial" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos" className="text-[11px] font-black uppercase tracking-widest">
+                            Todo el equipo
+                          </SelectItem>
+                          {ranking.map(p => (
+                            <SelectItem 
+                              key={p.id} 
+                              value={p.name}
+                              className="text-[11px] font-black uppercase tracking-widest"
                             >
-                              {t === 'todos' ? 'TODOS' : t.toUpperCase()}
-                            </button>
+                              <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: `#${p.avatar_color}` }} />
+                                {p.name}
+                              </div>
+                            </SelectItem>
                           ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center gap-3 bg-muted/50 p-1.5 pl-4 rounded-2xl border border-border shrink-0 ml-auto md:ml-0 overflow-hidden">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Tipo:</span>
+                      <div className="flex gap-1">
+                        {(['todos', 'Cliente', 'Partner'] as const).map(t => (
+                          <button
+                            key={t}
+                            onClick={() => setTipoFilter(t)}
+                            className={cn(
+                              "px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
+                              tipoFilter === t ? "bg-white dark:bg-primary text-[#002B49] dark:text-white shadow-sm border border-border" : "text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            {t === 'todos' ? 'TOTAL' : t.toUpperCase()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Vista Escritorio: Tablero Horizontal */}
+                <div className="flex gap-6 overflow-x-auto pb-8 -mx-5 px-5 no-scrollbar scroll-smooth">
+                  {boardColumns.map(col => {
+                    let colContacts = pipelineContacts.filter(c => c.status === col.id);
+                    
+                    // Aplicar filtro de comercial
+                    if (commercialBoardFilter !== 'todos') {
+                      colContacts = colContacts.filter(c => c.assigned_profile?.name === commercialBoardFilter);
+                    }
+
+                    // Aplicar filtro de tipo (Cliente/Partner)
+                    if (tipoFilter !== 'todos') {
+                      colContacts = colContacts.filter(c => c.tipo === tipoFilter);
+                    }
+
+                    // En el Comité (Board horizontal), mantenemos las columnas clave visibles SIEMPRE
+                    const whitelist = activePipeline === 'captura' 
+                      ? ['nuevo', 'agendado', 'propuesta_mandada'] 
+                      : ['propuesta_solicitada', 'propuesta_entregada', 'aceptada', 'prevision_cierre', 'rechazada'];
+
+                    if (colContacts.length === 0 && !whitelist.includes(col.id)) return null;
+                    
+                    return (
+                      <div key={col.id} className="min-w-[320px] max-w-[320px] flex flex-col gap-5">
+                        <div className="flex items-center justify-between px-2">
+                          <h3 className="flex items-center gap-2">
+                            <span className={cn("w-2 h-2 rounded-full", col.color)} />
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground">{col.label}</span>
+                          </h3>
+                          <span className="bg-muted px-2 py-0.5 rounded-full text-[10px] font-black text-muted-foreground tabular-nums">
+                            {colContacts.length}
+                          </span>
+                        </div>
+                        
+                        <div className="space-y-4">
+                          {colContacts.length === 0 ? (
+                            <div className="h-24 rounded-[2rem] border border-dashed border-border flex items-center justify-center opacity-30">
+                              <span className="text-[10px] font-black uppercase tracking-widest italic">Vacío</span>
+                            </div>
+                          ) : (
+                            colContacts.map(c => (
+                              <BoardCard key={c.id} c={c} latestActivity={latestActivitiesMap[c.id]} />
+                            ))
+                          )}
                         </div>
                       </div>
-                      <div className="space-y-3">
-                        {filteredContacts.length === 0 
-                          ? <p className="text-center py-8 text-muted-foreground font-medium text-sm bg-slate-50 dark:bg-white/5 rounded-[2rem] border border-dashed border-slate-200 dark:border-white/10">Sin contactos con estos filtros</p>
-                          : filteredContacts.map((c, i) => (
-                              <ContactCard 
-                                key={c.id} 
-                                contact={c} 
-                                index={i} 
-                                isExpanded={expandedId === c.id}
-                                onToggle={() => setExpandedId(prev => prev === c.id ? null : c.id)}
-                              />
-                            ))
-                        }
-                      </div>
-                    </motion.section>
-                  )}
-                </AnimatePresence>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
-                {/* Reuniones hoy */}
+            {/* ══════════ TAB 1: PIPELINE ══════════ */}
+            {activeTab === 'Pipeline' && (
+              <>                {/* Reuniones hoy */}
                 <section className="glass rounded-[2.5rem] p-8 backdrop-blur-md">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="w-10 h-10 rounded-2xl bg-sky/10 flex items-center justify-center text-sky">
@@ -535,20 +710,20 @@ const DashboardPage = () => {
                       <AlertCircle className="w-32 h-32 text-rose-500" />
                     </div>
                     <div className="flex items-center gap-4 mb-6 relative z-10">
-                      <div className="w-12 h-12 rounded-2xl bg-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-200">
+                      <div className="w-12 h-12 rounded-2xl bg-rose-600 flex items-center justify-center text-white shadow-lg shadow-rose-200">
                         <AlertCircle className="w-6 h-6" />
                       </div>
                       <div>
-                        <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-300">Atención Crítica</h2>
-                        <p className="text-2xl font-heading font-black text-white tracking-tighter">{pendingContacts.length} Pendientes</p>
+                        <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-600 dark:text-rose-300">Atención Crítica</h2>
+                        <p className="text-2xl font-heading font-black text-foreground dark:text-white tracking-tighter">{pendingContacts.length} Pendientes</p>
                       </div>
                     </div>
                     <div className="space-y-3 relative z-10">
                       {pendingContacts.map(({ contact: c, reason }) => (
-                        <div key={c.id} className="flex items-center gap-4 py-4 px-5 bg-white/10 backdrop-blur rounded-[1.5rem] border border-white/20 shadow-sm hover:translate-x-1 transition-transform">
+                        <div key={c.id} className="flex items-center gap-4 py-4 px-5 bg-muted/50 dark:bg-white/10 backdrop-blur rounded-[1.5rem] border border-border dark:border-white/20 shadow-sm hover:translate-x-1 transition-transform">
                           <div className="flex-1 min-w-0">
-                            <p className="font-heading font-black text-sm text-white truncate tracking-tight">{c.company?.name}</p>
-                            <p className="text-[10px] text-white/50 font-bold truncate opacity-70 uppercase tracking-widest mt-0.5">{c.first_name} {c.last_name}</p>
+                            <p className="font-heading font-black text-sm text-foreground dark:text-white truncate tracking-tight">{c.company?.name}</p>
+                            <p className="text-[10px] text-muted-foreground font-bold truncate opacity-80 uppercase tracking-widest mt-0.5">{c.first_name} {c.last_name}</p>
                             <div className="flex items-center gap-1.5 mt-2">
                               <span className="w-1 h-1 rounded-full bg-rose-500" />
                               <p className="text-[9px] font-black text-rose-600 uppercase tracking-[0.1em]">{reason}</p>
@@ -567,7 +742,7 @@ const DashboardPage = () => {
             )}
 
             {/* ══════════ TAB 1: PIPELINE ══════════ */}
-            {activeTab === 1 && (
+            {activeTab === 'Pipeline' && (
               <>
                 {/* Métricas de rendimiento */}
                 <div className="glass rounded-[2.5rem] p-8 space-y-8 backdrop-blur-md">
@@ -629,7 +804,7 @@ const DashboardPage = () => {
                             <span className="text-[10px] font-black text-white tabular-nums tracking-widest">{s.count}</span>
                           </motion.div>
                         </div>
-                        <span className="text-sm font-black tabular-nums text-muted-foreground w-24 text-right shrink-0">
+                        <span className="text-xs font-black tabular-nums text-foreground w-20 text-right shrink-0">
                           {fmtValor(s.valor)}
                         </span>
                       </div>
@@ -672,24 +847,24 @@ const DashboardPage = () => {
                 {/* Motivos de pérdida premium */}
                 {perdidoMotivos.length > 0 && (
                   <div className="glass rounded-[2.5rem] p-8 backdrop-blur-md">
-                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60 mb-8 font-bold">Análisis de Descartes</h3>
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-8 font-bold">Análisis de Descartes</h3>
                     <div className="space-y-5">
                       {perdidoMotivos.map(([motivo, count]) => {
                         const pct = Math.round((count / (stats?.perdido || 1)) * 100);
                         return (
                           <div key={motivo} className="flex items-center gap-5">
-                            <span className="text-[10px] font-black w-28 shrink-0 text-white/40 uppercase truncate">{motivo}</span>
-                            <div className="flex-1 h-6 bg-white/5 rounded-xl overflow-hidden border border-white/10">
+                            <span className="text-[10px] font-black w-28 shrink-0 text-muted-foreground uppercase truncate">{motivo}</span>
+                            <div className="flex-1 h-6 bg-muted/40 dark:bg-white/5 rounded-xl overflow-hidden border border-border dark:border-white/10">
                               <motion.div
                                 className="h-full bg-rose-500/20 rounded-xl flex items-center justify-end pr-3 border border-rose-500/10"
                                 initial={{ width: 0 }}
                                 animate={{ width: `${pct}%` }}
                                 transition={{ duration: 0.5 }}
                               >
-                                <span className="text-[9px] font-black text-rose-400 tabular-nums">{count}</span>
+                                <span className="text-[9px] font-black text-rose-500/80 dark:text-rose-400 tabular-nums">{count}</span>
                               </motion.div>
                             </div>
-                            <span className="text-[10px] font-black text-white/20 w-10 text-right shrink-0">{pct}%</span>
+                            <span className="text-[10px] font-black text-muted-foreground/40 w-10 text-right shrink-0">{pct}%</span>
                           </div>
                         );
                       })}
@@ -700,7 +875,7 @@ const DashboardPage = () => {
             )}
 
             {/* ══════════ TAB 2: EQUIPO ══════════ */}
-            {activeTab === 2 && (
+            {activeTab === 'Equipo' && (
               <>
                 {/* Ranking Institucional */}
                 <div className="glass rounded-[2.5rem] p-8 border border-border/50 shadow-sm backdrop-blur-md">
@@ -722,27 +897,29 @@ const DashboardPage = () => {
                           <button
                             onClick={() => setExpandedCommercial(isExpanded ? null : p.id)}
                             className={cn(
-                              "w-full flex items-center gap-6 py-5 px-6 rounded-[2rem] transition-all duration-500 border",
-                              isExpanded ? "bg-white/10 border-white/20 shadow-inner translate-x-1" : "bg-white/5 border-white/10 hover:border-white/20"
+                              "w-full flex items-center gap-4 py-4 px-5 rounded-[2rem] transition-all duration-500 border",
+                              isExpanded 
+                                ? "bg-muted border-border shadow-inner translate-x-1" 
+                                : "bg-card border-border hover:border-primary/30 hover:bg-muted/50"
                             )}
                           >
-                            <span className="text-xl font-heading font-black text-white/10 w-8 tabular-nums italic">0{i + 1}</span>
-                            <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black text-white shrink-0 shadow-xl" style={{ backgroundColor: `#${p.avatar_color}` }}>
+                            <span className="text-xl font-heading font-black text-muted-foreground/20 w-8 tabular-nums italic">0{i + 1}</span>
+                            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-black text-white shrink-0 shadow-lg" style={{ backgroundColor: `#${p.avatar_color}` }}>
                               {p.name[0]}
                             </div>
                             <div className="flex-1 min-w-0 text-left">
-                              <p className="font-heading font-black text-lg text-white truncate tracking-tight leading-tight">{p.name}</p>
+                              <p className="font-heading font-black text-base text-foreground truncate tracking-tight leading-tight">{p.name}</p>
                               <div className="flex items-center gap-3 mt-1.5">
-                                <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">{p.total} ASIGNADOS</span>
-                                <span className="w-1 h-1 rounded-full bg-white/10" />
+                                <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">{p.total} ASIGNADOS</span>
+                                <span className="w-1 h-1 rounded-full bg-border" />
                                 <span className="text-[9px] font-black text-sky uppercase tracking-widest">{fmtValor(p.valor)}</span>
                               </div>
                             </div>
-                            <div className="text-right shrink-0">
-                              <span className="text-3xl font-heading font-black text-emerald-400 tabular-nums tracking-tighter block">{p.cerrados}</span>
-                              <span className="text-[8px] text-emerald-400/60 font-black uppercase tracking-[0.2em]">Cierres</span>
+                            <div className="text-right shrink-0 pr-2">
+                              <span className="text-2xl font-heading font-black text-emerald-500 tabular-nums tracking-tighter block leading-none">{p.cerrados}</span>
+                              <span className="text-[8px] text-emerald-500/60 font-black uppercase tracking-[0.2em]">Cierres</span>
                             </div>
-                            {isExpanded ? <ChevronUp className="w-5 h-5 text-white/20" /> : <ChevronDown className="w-5 h-5 text-white/20" />}
+                            {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground/40" /> : <ChevronDown className="w-4 h-4 text-muted-foreground/40" />}
                           </button>
                           <AnimatePresence>
                             {isExpanded && (
@@ -754,12 +931,12 @@ const DashboardPage = () => {
                               >
                                 <div className="p-8 space-y-3">
                                   {theirContacts.length === 0
-                                    ? <p className="text-[9px] font-black text-white/20 uppercase text-center py-6 border border-dashed border-white/10 rounded-3xl">Pestaña estratégica vacía</p>
+                                    ? <p className="text-[9px] font-black text-muted-foreground uppercase text-center py-6 border border-dashed border-border rounded-3xl">Sin contactos recientemente asignados</p>
                                     : theirContacts.map(c => (
-                                        <div key={c.id} className="flex items-center gap-5 py-4 px-6 bg-white/5 rounded-[1.5rem] border border-white/10 shadow-sm transition-transform hover:scale-[1.01]">
+                                        <div key={c.id} className="flex items-center gap-5 py-4 px-6 bg-card rounded-[1.5rem] border border-border shadow-sm transition-transform hover:scale-[1.01]">
                                           <div className="flex-1 min-w-0">
-                                            <p className="text-[11px] font-black text-white truncate uppercase tracking-tight">{c.company?.name}</p>
-                                            <p className="text-[9px] text-white/40 font-bold truncate italic mt-0.5">{c.first_name} {c.last_name}</p>
+                                            <p className="text-[11px] font-black text-foreground truncate uppercase tracking-tight">{c.company?.name}</p>
+                                            <p className="text-[9px] text-muted-foreground font-bold truncate italic mt-0.5">{c.first_name} {c.last_name}</p>
                                           </div>
                                           <StatusBadge status={c.status} />
                                         </div>

@@ -137,7 +137,7 @@ export const ContactCard = ({ contact, index = 0, isExpanded, onToggle }: Contac
                 })()}
 
                 {contact.scheduled_date && (
-                  <div className="flex items-center gap-3 mb-4 text-xs font-semibold text-white/50 bg-white/5 rounded-2xl px-4 py-2.5 border border-white/10">
+                  <div className="flex items-center gap-3 mb-4 text-xs font-bold text-slate-500 dark:text-white/50 bg-slate-50 dark:bg-white/5 rounded-2xl px-4 py-2.5 border border-slate-100 dark:border-white/10 transition-colors">
                     <Calendar className="w-4 h-4 shrink-0 text-sky" />
                     <span>
                       {new Date(contact.scheduled_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -203,6 +203,12 @@ export const ContactCard = ({ contact, index = 0, isExpanded, onToggle }: Contac
         </AnimatePresence>
       </motion.div>
 
+      <AgendarModal 
+        open={agendarOpen} 
+        onOpenChange={setAgendarOpen} 
+        contactId={contact.id} 
+        contactName={contact.company?.name || `${contact.first_name} ${contact.last_name}`} 
+      />
       <RegistrarContactoModal
         open={registrarOpen}
         onOpenChange={setRegistrarOpen}
