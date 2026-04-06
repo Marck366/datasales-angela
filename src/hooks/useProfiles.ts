@@ -9,6 +9,7 @@ export const useProfiles = () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
+        .eq('is_active', true)
         .order('name');
       if (error) throw error;
       return (data || []) as unknown as Profile[];

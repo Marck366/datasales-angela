@@ -52,6 +52,8 @@ export interface Contact {
   estado_certificacion?: string;
   empleados_empresa?: string;
   decision_maker?: boolean;
+  // Sub-contactos
+  is_primary: boolean;
   // Forecast
   probabilidad_cierre?: number;
   fecha_cierre_probable?: string;
@@ -86,4 +88,5 @@ export interface ESGEvent {
   website?: string;
   attending: boolean;
   notes?: string;
+  price_per_attendee?: number;
 }

@@ -105,6 +105,7 @@ export type Database = {
           tipo: string | null
           updated_at: string | null
           valor_potencial: number | null
+          is_primary: boolean
         }
         Insert: {
           assigned_to?: string | null
@@ -127,6 +128,7 @@ export type Database = {
           tipo?: string | null
           updated_at?: string | null
           valor_potencial?: number | null
+          is_primary?: boolean
         }
         Update: {
           assigned_to?: string | null
@@ -149,6 +151,7 @@ export type Database = {
           tipo?: string | null
           updated_at?: string | null
           valor_potencial?: number | null
+          is_primary?: boolean
         }
         Relationships: [
           {
