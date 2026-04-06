@@ -21,6 +21,7 @@ type ContactRow = Tables<'contacts'> & {
   fecha_cierre_probable?: string | null;
   next_step?: string | null;
   score_ai?: number | null;
+  is_primary?: boolean | null;
 };
 
 /** Invalidate React Query caches affected by contact changes. Call after create/update/delete. */
@@ -72,6 +73,7 @@ const mapContact = (row: ContactRow): Contact => ({
   estado_certificacion: row.estado_certificacion || undefined,
   empleados_empresa: row.empleados_empresa || undefined,
   decision_maker: row.decision_maker ?? false,
+  is_primary: row.is_primary ?? false,
   probabilidad_cierre: row.probabilidad_cierre || undefined,
   fecha_cierre_probable: row.fecha_cierre_probable || undefined,
   next_step: row.next_step || undefined,
@@ -212,6 +214,66 @@ export const useDeleteContact = () => {
   });
 };
 
+export const useCompanyContacts = (companyId: string | undefined) => {
+  return useQuery({
+    queryKey: ['company_contacts', companyId],
+    enabled: !!companyId,
+    staleTime: 1000 * 60 * 2,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('id, first_name, last_name, job_title, is_primary, phone, email, last_activity_at')
+        .eq('company_id', companyId!)
+        .order('is_primary', { ascending: false })
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return (data || []) as Array<{
+        id: string;
+        first_name: string;
+        last_name: string;
+        job_title: string | null;
+        is_primary: boolean;
+        phone: string | null;
+        email: string | null;
+        last_activity_at: string | null;
+      }>;
+    },
+  });
+};
+
+export const useSetPrimaryContact = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ contactId, companyId }: { contactId: string; companyId: string }) => {
+      // Unset current primary for this company
+      const { error: e1 } = await supabase
+        .from('contacts')
+        .update({ is_primary: false } as Record<string, unknown>)
+        .eq('company_id', companyId)
+        .eq('is_primary', true);
+      
+      if (e1) {
+        console.error('Error unsetting current primary:', e1);
+        // We don't throw yet, as there might be no primary set which is fine
+      }
+
+      // Set new primary
+      const { error: e2 } = await supabase
+        .from('contacts')
+        .update({ is_primary: true } as Record<string, unknown>)
+        .eq('id', contactId);
+      
+      if (e2) throw e2;
+    },
+    onSuccess: (_, { contactId }) => {
+      invalidateContactCaches(qc);
+      // Explicitly invalidate current contact query to ensure UI updates
+      qc.invalidateQueries({ queryKey: ['contacts', contactId] });
+      qc.invalidateQueries({ queryKey: ['company_contacts'] });
+    },
+  });
+};
+
 export const useCreateContact = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -222,6 +284,7 @@ export const useCreateContact = () => {
       email?: string;
       phone?: string;
       linkedin_url?: string;
+      job_title?: string;
       pipeline?: string;
       status?: string;
       prioridad?: string;
@@ -235,24 +298,31 @@ export const useCreateContact = () => {
       estado_certificacion?: string;
       empleados_empresa?: string;
       decision_maker?: boolean;
+      company_id?: string;
+      is_primary?: boolean;
     }) => {
       let company_id: string;
-      const { data: existing } = await supabase
-        .from('companies')
-        .select('id')
-        .ilike('name', input.empresa)
-        .maybeSingle();
 
-      if (existing) {
-        company_id = existing.id;
+      if (input.company_id) {
+        company_id = input.company_id;
       } else {
-        const { data: newCo, error: coErr } = await supabase
+        const { data: existing } = await supabase
           .from('companies')
-          .insert({ name: input.empresa })
           .select('id')
-          .single();
-        if (coErr) throw coErr;
-        company_id = newCo.id;
+          .ilike('name', input.empresa)
+          .maybeSingle();
+
+        if (existing) {
+          company_id = existing.id;
+        } else {
+          const { data: newCo, error: coErr } = await supabase
+            .from('companies')
+            .insert({ name: input.empresa })
+            .select('id')
+            .single();
+          if (coErr) throw coErr;
+          company_id = newCo.id;
+        }
       }
 
       const insertPayload: TablesInsert<'contacts'> & Record<string, unknown> = {
@@ -262,6 +332,7 @@ export const useCreateContact = () => {
         email: input.email || null,
         phone: input.phone || null,
         linkedin_url: input.linkedin_url || null,
+        job_title: input.job_title || null,
         pipeline: input.pipeline || 'captura',
         status: input.status || 'nuevo',
         prioridad: input.prioridad || 'media',
@@ -275,11 +346,15 @@ export const useCreateContact = () => {
         estado_certificacion: input.estado_certificacion || null,
         empleados_empresa: input.empleados_empresa || null,
         decision_maker: input.decision_maker ?? false,
+        is_primary: input.is_primary ?? false,
       };
 
       const { error } = await supabase.from('contacts').insert(insertPayload);
       if (error) throw error;
     },
-    onSuccess: () => invalidateContactCaches(qc),
+    onSuccess: () => {
+      invalidateContactCaches(qc);
+      qc.invalidateQueries({ queryKey: ['company_contacts'] });
+    },
   });
 };

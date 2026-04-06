@@ -33,3 +33,15 @@ export const useToggleEventAttending = () => {
     },
   });
 };
+export const useCreateEvent = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (event: Omit<ESGEvent, 'id'>) => {
+      const { error } = await supabase.from('events').insert(event);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['events'] });
+    },
+  });
+};
