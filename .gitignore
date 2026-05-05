@@ -29,3 +29,10 @@ dist-ssr
 *.sw?
 .vercel
 .supabase
+
+# Python / Backend
+__pycache__/
+*.pyc
+*.pyo
+backend/venv/
+backend/seed_demo_data.py

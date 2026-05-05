@@ -1,96 +1,93 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
-import { Profile } from '@/types';
+import { useQueryClient } from '@tanstack/react-query';
+import { authApi, getToken, setToken as persistToken, clearToken, type UserOut } from '@/lib/api';
+import { Profile, UserRole } from '@/types';
 
 interface AuthContextType {
-  session: Session | null;
-  user: User | null;
+  /** JWT en localStorage. `null` si no hay sesión. Sustituye al antiguo `session` de Supabase. */
+  token: string | null;
+  /** Usuario autenticado (mismo objeto que `profile`, mantenido para retrocompat). */
+  user: Profile | null;
+  /** Perfil del usuario (mismo objeto que `user`). */
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, name: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  /** @deprecated mantenido por compat — el flag `session` actual mapea a `token`. */
+  session: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const mapUserToProfile = (u: UserOut): Profile => ({
+  id: u.id,
+  name: u.name,
+  email: u.email,
+  role: (u.role as UserRole) || 'comercial',
+  avatar_color: u.avatar_color || 'gray',
+  created_at: '',
+});
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    if (error) {
-      console.error('Error cargando perfil de usuario:', error.message);
-      return;
-    }
-    if (data) {
-      setProfile(data as unknown as Profile);
-    }
-  };
+  const queryClient = useQueryClient();
 
   useEffect(() => {
-    // Timeout de seguridad: si Supabase no responde en 4s, desbloquear la app
-    const timeout = setTimeout(() => setLoading(false), 4000);
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        clearTimeout(timeout);
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          setTimeout(() => fetchProfile(session.user.id), 0);
-        } else {
-          setProfile(null);
-        }
-        setLoading(false);
-      }
-    );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      clearTimeout(timeout);
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      }
+    const stored = getToken();
+    if (!stored) {
       setLoading(false);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(timeout);
-    };
+      return;
+    }
+    authApi
+      .me()
+      .then(({ user }) => {
+        setToken(stored);
+        setProfile(mapUserToProfile(user));
+      })
+      .catch(() => {
+        clearToken();
+        setToken(null);
+        setProfile(null);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error as Error | null };
-  };
-
-  const signUp = async (email: string, password: string, name: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name }, emailRedirectTo: window.location.origin },
-    });
-    return { error: error as Error | null };
+    try {
+      const { access_token } = await authApi.login(email, password);
+      persistToken(access_token);
+      const { user } = await authApi.me();
+      setToken(access_token);
+      setProfile(mapUserToProfile(user));
+      return { error: null };
+    } catch (err) {
+      const error = err as { response?: { data?: { detail?: string } }; message?: string };
+      const detail = error?.response?.data?.detail || error?.message || 'Error de autenticación';
+      return { error: new Error(detail) };
+    }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    clearToken();
+    setToken(null);
     setProfile(null);
+    queryClient.clear();
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider
+      value={{
+        token,
+        user: profile,
+        profile,
+        loading,
+        signIn,
+        signOut,
+        session: token, // compat: `session` truthy ↔ token presente
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

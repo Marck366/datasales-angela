@@ -5,7 +5,7 @@ import { useCreateActivity } from '@/hooks/useActivities';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { VoiceInputButton } from '@/components/ui/VoiceInputButton';
-import { supabase } from '@/integrations/supabase/client';
+import { contactsApi } from '@/lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { calcSeguimientoDate } from '@/lib/semana';
 import { format } from 'date-fns';
@@ -85,9 +85,8 @@ export const RegistrarContactoModal = ({ open, onOpenChange, contact }: Props) =
       // 1. Create communication activity
       await createActivity.mutateAsync({
         contact_id: contact.id,
-        type: type as any, // Activity type from fixed contactTypes
+        type: type as any,
         content: `${typeLabel} realizada${notes ? `: ${notes}` : ''}`,
-        created_by: profile.id,
       });
 
       // 2. If status changed, create status activity and update contact
@@ -98,30 +97,15 @@ export const RegistrarContactoModal = ({ open, onOpenChange, contact }: Props) =
           old_value: contact.status,
           new_value: newStatus,
           content: notes || 'Cambio de estado durante registro de nota',
-          created_by: profile.id,
         });
       }
 
       // 3. Update contact (status, follow-up)
       const seguimiento = calcSeguimientoDate(type);
-      const updateData: Record<string, string | number | boolean | null> = { 
+      await contactsApi.update(contact.id, {
         status: newStatus,
-        seguimiento_date: seguimiento, 
-        updated_at: new Date().toISOString() 
-      };
-
-      if (isStatusChanged) {
-        updateData.status_changed_at = new Date().toISOString();
-      }
-
-      const { error: updateError } = await supabase
-        .from('contacts')
-        .update(updateData)
-        .eq('id', contact.id);
-
-      if (updateError) {
-        throw new Error(`DB Update Error: ${updateError.message}`);
-      }
+        seguimiento_date: seguimiento,
+      });
 
       invalidateContactCaches(qc);
       toast({

@@ -3,7 +3,6 @@ import { useCompanyContacts, useSetPrimaryContact } from '@/hooks/useContacts';
 import { Star, Plus, Phone, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from '@/hooks/use-toast';
-import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -17,27 +16,19 @@ export const SubContactsList = ({ companyId, currentContactId, onAddSubContact }
   const navigate = useNavigate();
   const { data: siblings = [] } = useCompanyContacts(companyId);
   const setPrimary = useSetPrimaryContact();
-  const [confirmId, setConfirmId] = useState<string | null>(null);
 
   const handleSetPrimary = (contactId: string) => {
-    if (confirmId === contactId) {
-      setPrimary.mutate(
-        { contactId, companyId },
-        {
-          onSuccess: () => {
-            toast({ title: '★ Contacto principal actualizado' });
-            setConfirmId(null);
-          },
-          onError: () => {
-            toast({ title: 'Error al cambiar contacto principal', variant: 'destructive' });
-            setConfirmId(null);
-          },
-        }
-      );
-    } else {
-      setConfirmId(contactId);
-      setTimeout(() => setConfirmId(null), 3000);
-    }
+    setPrimary.mutate(
+      { contactId, companyId },
+      {
+        onSuccess: () => {
+          toast({ title: '★ Contacto principal actualizado' });
+        },
+        onError: () => {
+          toast({ title: 'Error al cambiar contacto principal', variant: 'destructive' });
+        },
+      }
+    );
   };
 
   const getDaysAgo = (dateStr: string | null) => {
@@ -93,14 +84,10 @@ export const SubContactsList = ({ companyId, currentContactId, onAddSubContact }
               {!s.is_primary && (
                 <button
                   onClick={(e) => { e.stopPropagation(); handleSetPrimary(s.id); }}
-                  className={`ml-1 p-1 rounded-full transition-all ${
-                    confirmId === s.id
-                      ? 'bg-amber-100 dark:bg-amber-500/20 ring-2 ring-amber-400'
-                      : 'hover:bg-slate-100 dark:hover:bg-white/10'
-                  }`}
-                  title={confirmId === s.id ? 'Tap de nuevo para confirmar' : 'Hacer principal'}
+                  className="ml-1 p-1 rounded-full transition-all hover:bg-amber-50 dark:hover:bg-amber-500/10"
+                  title="Hacer principal"
                 >
-                  <Star className={`w-3 h-3 ${confirmId === s.id ? 'fill-amber-400 text-amber-400' : 'text-slate-300 dark:text-white/20'}`} />
+                  <Star className="w-3 h-3 text-slate-300 dark:text-white/20 hover:text-amber-400 transition-colors" />
                 </button>
               )}
 

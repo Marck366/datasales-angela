@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Sparkles, Brain, Loader2, RefreshCw } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { aiApi } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Contact, Activity } from '@/types';
@@ -29,14 +29,12 @@ export const PrepararReunionDrawer = ({ open, onOpenChange, contact, activities 
     setLoading(true);
     setSummary(null);
     try {
-      const { data, error } = await supabase.functions.invoke('preparar-reunion', {
-        body: { contact, activities }
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.details || data.error);
-      
-      setSummary(data.summary);
+      const recent = activities.slice(0, 5).map((a) => ({
+        type: a.type,
+        content: a.content || '',
+      }));
+      const data = await aiApi.prepararReunion(contact.id, recent);
+      setSummary(data.briefing);
       toast({ title: 'Briefing generado con éxito' });
     } catch (err) {
       const error = err as Error;

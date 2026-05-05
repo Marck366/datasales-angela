@@ -5,7 +5,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ReactNode, lazy, Suspense } from "react";
-import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 
 // Pages — lazy loaded para reducir bundle inicial
 const Index = lazy(() => import("./pages/Index"));
@@ -31,16 +30,9 @@ const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   return <>{children}</>;
 };
 
-const RealtimeSync = () => {
-  useRealtimeSync();
-  return null;
-};
-
 const AppRoutes = () => {
-  const { session } = useAuth();
   return (
     <>
-      {session && <RealtimeSync />}
       <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" /></div>}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />

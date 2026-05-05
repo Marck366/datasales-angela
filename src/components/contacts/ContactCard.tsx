@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, forwardRef } from 'react';
 import { Contact } from '@/types';
 import { StatusBadge } from './StatusBadge';
 import { TipoBadge } from './TipoBadge';
@@ -30,7 +30,7 @@ interface ContactCardProps {
   onToggle: () => void;
 }
 
-export const ContactCard = ({ contact, index = 0, isExpanded, onToggle }: ContactCardProps) => {
+export const ContactCard = forwardRef<HTMLDivElement, ContactCardProps>(({ contact, index = 0, isExpanded, onToggle }, ref) => {
   const navigate = useNavigate();
   const [agendarOpen, setAgendarOpen] = useState(false);
   const [registrarOpen, setRegistrarOpen] = useState(false);
@@ -46,8 +46,8 @@ export const ContactCard = ({ contact, index = 0, isExpanded, onToggle }: Contac
     : null;
 
   return (
-    <>
       <motion.div
+        ref={ref}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: index * 0.05, type: 'spring', stiffness: 300, damping: 30 }}
@@ -201,24 +201,23 @@ export const ContactCard = ({ contact, index = 0, isExpanded, onToggle }: Contac
             </motion.div>
           )}
         </AnimatePresence>
+        <AgendarModal 
+          open={agendarOpen} 
+          onOpenChange={setAgendarOpen} 
+          contactId={contact.id} 
+          contactName={contact.company?.name || `${contact.first_name} ${contact.last_name}`} 
+        />
+        <RegistrarContactoModal
+          open={registrarOpen}
+          onOpenChange={setRegistrarOpen}
+          contact={contact}
+        />
+        <MailSmartDrawer
+          open={mailOpen}
+          onOpenChange={setMailOpen}
+          contact={contact}
+        />
       </motion.div>
-
-      <AgendarModal 
-        open={agendarOpen} 
-        onOpenChange={setAgendarOpen} 
-        contactId={contact.id} 
-        contactName={contact.company?.name || `${contact.first_name} ${contact.last_name}`} 
-      />
-      <RegistrarContactoModal
-        open={registrarOpen}
-        onOpenChange={setRegistrarOpen}
-        contact={contact}
-      />
-      <MailSmartDrawer
-        open={mailOpen}
-        onOpenChange={setMailOpen}
-        contact={contact}
-      />
-    </>
   );
-};
+});
+ContactCard.displayName = 'ContactCard';

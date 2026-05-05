@@ -1,17 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { eventsApi } from '@/lib/api';
 import { ESGEvent } from '@/types';
 
 export const useEvents = () => {
   return useQuery({
     queryKey: ['events'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .order('date', { ascending: true });
-      if (error) throw error;
-      return (data || []).map((row) => ({
+      const data = await eventsApi.list();
+      return data.map((row) => ({
         ...row,
         date: row.date ?? '',
         city: row.city ?? '',
@@ -25,20 +21,19 @@ export const useToggleEventAttending = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, attending }: { id: string; attending: boolean }) => {
-      const { error } = await supabase.from('events').update({ attending }).eq('id', id);
-      if (error) throw error;
+      await eventsApi.update(id, { attending });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['events'] });
     },
   });
 };
+
 export const useCreateEvent = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (event: Omit<ESGEvent, 'id'>) => {
-      const { error } = await supabase.from('events').insert(event);
-      if (error) throw error;
+      await eventsApi.create(event);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['events'] });

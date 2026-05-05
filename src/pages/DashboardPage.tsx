@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { supabase } from '@/integrations/supabase/client';
+import { dashboardApi } from '@/lib/api';
 import { useContacts } from '@/hooks/useContacts';
 import { useAllActivities } from '@/hooks/useActivities';
 import { ContactCard } from '@/components/contacts/ContactCard';
@@ -25,21 +25,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-/* ── RPC hooks ── */
+/* ── Ranking hook ── */
 interface RankingEntry {
-  id: string; name: string; email: string; role: string;
-  avatar_color: string; total: number; cerrados: number;
-  agendados: number; valor: number;
+  user_id: string;
+  name: string;
+  avatar_color: string | null;
+  total_contacts: number;
 }
 
 const useDashboardRanking = () =>
   useQuery({
     queryKey: ['dashboard_ranking'],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_dashboard_ranking');
-      if (error) throw error;
-      return data as unknown as RankingEntry[];
-    },
+    queryFn: () => dashboardApi.ranking(),
     staleTime: 0,
     refetchOnMount: true,
   });
@@ -378,6 +375,20 @@ const DashboardPage = () => {
     return map;
   }, [contacts]);
 
+  // Enriquece el ranking con datos calculados client-side (cerrados, valor)
+  // ya que el endpoint /dashboard/ranking solo devuelve total_contacts.
+  const enrichedRanking = useMemo(() => {
+    return ranking.map(p => {
+      const userContacts = contactsByCommercial[p.user_id] || [];
+      return {
+        ...p,
+        total: p.total_contacts,
+        cerrados: userContacts.filter(c => c.status === 'cerrado' || c.status === 'aceptada').length,
+        valor: userContacts.reduce((sum, c) => sum + (c.valor_potencial || 0), 0),
+      };
+    });
+  }, [ranking, contactsByCommercial]);
+
   const sortedTableContacts = useMemo(() => {
     let list = contacts;
     if (tableTipoFilter === 'Cliente') list = list.filter(c => c.tipo === 'Cliente');
@@ -579,8 +590,8 @@ const DashboardPage = () => {
                             Todo el equipo
                           </SelectItem>
                           {ranking.map(p => (
-                            <SelectItem 
-                              key={p.id} 
+                            <SelectItem
+                              key={p.user_id}
                               value={p.name}
                               className="text-[11px] font-black uppercase tracking-widest"
                             >
@@ -889,13 +900,13 @@ const DashboardPage = () => {
                     </div>
                   </div>
                   <div className="space-y-3">
-                    {ranking.map((p, i) => {
-                      const isExpanded = expandedCommercial === p.id;
-                      const theirContacts = (contactsByCommercial[p.id] || []).slice(0, 5);
+                    {enrichedRanking.map((p, i) => {
+                      const isExpanded = expandedCommercial === p.user_id;
+                      const theirContacts = (contactsByCommercial[p.user_id] || []).slice(0, 5);
                       return (
-                        <div key={p.id}>
+                        <div key={p.user_id}>
                           <button
-                            onClick={() => setExpandedCommercial(isExpanded ? null : p.id)}
+                            onClick={() => setExpandedCommercial(isExpanded ? null : p.user_id)}
                             className={cn(
                               "w-full flex items-center gap-4 py-4 px-5 rounded-[2rem] transition-all duration-500 border",
                               isExpanded 
