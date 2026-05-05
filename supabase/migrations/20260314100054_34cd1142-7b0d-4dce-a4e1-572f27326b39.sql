@@ -1,1 +1,0 @@
-ALTER TABLE public.contacts ADD COLUMN IF NOT EXISTS meeting_type text;
