@@ -20,8 +20,8 @@ from dependencies.permissions import require_admin
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Rate limiting en memoria: 5 intentos en ventana de 15 min
-_LOGIN_WINDOW_SECONDS = 900
+# Rate limiting en memoria: 5 intentos en ventana de 3 min
+_LOGIN_WINDOW_SECONDS = 180
 _LOGIN_MAX_ATTEMPTS = 5
 _failed_attempts: dict[str, list[float]] = defaultdict(list)
 
@@ -33,7 +33,7 @@ def _rate_limit_check(key: str) -> None:
     if len(window) >= _LOGIN_MAX_ATTEMPTS:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Demasiados intentos fallidos. Espera 15 minutos antes de volver a intentarlo.",
+            detail="Demasiados intentos fallidos. Espera 3 minutos antes de volver a intentarlo.",
         )
 
 
@@ -49,10 +49,8 @@ def _reset_attempts(key: str) -> None:
 async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
     ip = request.client.host if request.client else "unknown"
     email_key = f"email:{body.email.lower()}"
-    ip_key = f"ip:{ip}"
 
     _rate_limit_check(email_key)
-    _rate_limit_check(ip_key)
 
     result = await db.execute(
         select(User).where(User.email == body.email, User.is_active == True)
@@ -61,7 +59,6 @@ async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends
 
     if user is None or not pwd_context.verify(body.password, user.hashed_password):
         _record_failed_attempt(email_key)
-        _record_failed_attempt(ip_key)
         logger.warning("LOGIN_FAILED email=%s ip=%s", body.email, ip)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -69,7 +66,6 @@ async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends
         )
 
     _reset_attempts(email_key)
-    _reset_attempts(ip_key)
     logger.info("LOGIN_OK user=%s role=%s ip=%s", user.id, user.role, ip)
     token = create_access_token(user)
     return TokenResponse(access_token=token)
