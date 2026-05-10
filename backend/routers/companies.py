@@ -20,6 +20,19 @@ async def list_companies(
     return result.scalars().all()
 
 
+@router.get("/{company_id}", response_model=CompanyOut)
+async def get_company(
+    company_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Company).where(Company.id == company_id))
+    company = result.scalar_one_or_none()
+    if company is None:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+    return company
+
+
 @router.post("/", response_model=CompanyOut, status_code=201)
 async def create_company(
     body: CompanyCreate,

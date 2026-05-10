@@ -76,12 +76,11 @@ export const RegistrarContactoModal = ({ open, onOpenChange, contact }: Props) =
       return;
     }
 
-    try {
-      const isStatusChanged = newStatus !== contact.status;
-      const typeLabel = contactTypes.find(t => t.value === type)?.label || type;
-      
-      console.log('Iniciando registro de actividad...', { type, isStatusChanged, newStatus });
+    const isStatusChanged = newStatus !== contact.status;
+    const typeLabel = contactTypes.find(t => t.value === type)?.label || type;
+    const seguimiento = calcSeguimientoDate(type);
 
+    try {
       // 1. Create communication activity
       await createActivity.mutateAsync({
         contact_id: contact.id,
@@ -89,7 +88,7 @@ export const RegistrarContactoModal = ({ open, onOpenChange, contact }: Props) =
         content: `${typeLabel} realizada${notes ? `: ${notes}` : ''}`,
       });
 
-      // 2. If status changed, create status activity and update contact
+      // 2. If status changed, create status activity
       if (isStatusChanged) {
         await createActivity.mutateAsync({
           contact_id: contact.id,
@@ -101,26 +100,28 @@ export const RegistrarContactoModal = ({ open, onOpenChange, contact }: Props) =
       }
 
       // 3. Update contact (status, follow-up)
-      const seguimiento = calcSeguimientoDate(type);
       await contactsApi.update(contact.id, {
         status: newStatus,
         seguimiento_date: seguimiento,
       });
 
-      invalidateContactCaches(qc);
       toast({
         title: isStatusChanged ? '✅ Estado y contacto registrados' : '✅ Contacto registrado',
         description: `Próximo seguimiento: ${format(new Date(seguimiento), "d 'de' MMMM", { locale: es })}`,
       });
-      
+
       onOpenChange(false);
     } catch (err) {
       const error = err as Error;
-      toast({ 
-        title: '❌ Error al registrar', 
+      toast({
+        title: '❌ Error al registrar',
         description: error.message || 'Verifica tu conexión o permisos de acceso.',
-        variant: 'destructive' 
+        variant: 'destructive'
       });
+    } finally {
+      // Siempre invalidar el cache, aunque alguna llamada haya fallado a la mitad
+      invalidateContactCaches(qc);
+      qc.invalidateQueries({ queryKey: ['activities'] });
     }
   };
 

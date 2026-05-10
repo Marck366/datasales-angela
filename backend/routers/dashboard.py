@@ -49,6 +49,7 @@ async def get_ranking(
         select(
             User.id,
             User.name,
+            User.role,
             User.avatar_color,
             func.count(Contact.id).label("total_contacts"),
         )
@@ -62,6 +63,7 @@ async def get_ranking(
         {
             "user_id": r.id,
             "name": r.name,
+            "role": r.role,
             "avatar_color": r.avatar_color,
             "total_contacts": r.total_contacts,
         }

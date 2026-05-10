@@ -17,6 +17,7 @@ class UserNested(BaseModel):
     id: str
     name: str
     avatar_color: Optional[str] = None
+    role: Optional[str] = None
     model_config = {"from_attributes": True}
 
 
@@ -99,6 +100,8 @@ class ContactOut(ContactBase):
     id: str
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    status_changed_at: Optional[datetime] = None
+    last_activity_at: Optional[datetime] = None
     company: Optional[CompanyNested] = None
     assignee: Optional[UserNested] = None
     model_config = {"from_attributes": True}

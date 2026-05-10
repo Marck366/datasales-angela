@@ -41,3 +41,11 @@ class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str = Field(min_length=8, max_length=100)
 
+
+class UpdateUserRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=2, max_length=100)
+    role: Optional[Literal["admin", "jefe_ventas", "comercial"]] = None
+    avatar_color: Optional[str] = Field(None, max_length=50)
+    is_active: Optional[bool] = None
+    password: Optional[str] = Field(None, min_length=8, max_length=100)
+

@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, Sparkles, Clock, MapPin, Tablet, Phone as PhoneIcon, Video, X } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isBefore, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useUpdateContactStatus } from '@/hooks/useContacts';
@@ -38,6 +38,14 @@ export const AgendarModal = ({ open, onOpenChange, contactId, contactName }: Age
   const handleSave = async () => {
     if (!date || !meetingType) {
       toast({ title: 'Campos requeridos', description: 'Selecciona fecha y tipo de reunión.', variant: 'destructive' });
+      return;
+    }
+    if (isBefore(date, startOfDay(new Date()))) {
+      toast({ title: 'Fecha no válida', description: 'No se puede agendar una reunión en el pasado.', variant: 'destructive' });
+      return;
+    }
+    if (notes.length > 1000) {
+      toast({ title: 'Notas demasiado largas', description: 'Máximo 1000 caracteres.', variant: 'destructive' });
       return;
     }
     try {

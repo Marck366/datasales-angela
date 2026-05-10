@@ -20,6 +20,19 @@ async def list_events(
     return result.scalars().all()
 
 
+@router.get("/{event_id}", response_model=EventOut)
+async def get_event(
+    event_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Event).where(Event.id == event_id))
+    event = result.scalar_one_or_none()
+    if event is None:
+        raise HTTPException(status_code=404, detail="Evento no encontrado")
+    return event
+
+
 @router.post("/", response_model=EventOut, status_code=201)
 async def create_event(
     body: EventCreate,

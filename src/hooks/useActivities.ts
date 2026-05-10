@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { activitiesApi, type ActivityOut } from '@/lib/api';
 import { useContacts } from '@/hooks/useContacts';
-import { Activity, ActivityType, ContactStatus, Priority } from '@/types';
+import { Activity, ActivityType, ContactStatus, Priority, UserRole } from '@/types';
 
 const mapActivity = (row: ActivityOut): Activity => ({
   id: row.id,
@@ -17,7 +17,7 @@ const mapActivity = (row: ActivityOut): Activity => ({
         id: row.creator.id,
         name: row.creator.name,
         email: '',
-        role: 'comercial' as const,
+        role: (row.creator.role as UserRole) || 'comercial',
         avatar_color: row.creator.avatar_color || 'gray',
         created_at: '',
       }

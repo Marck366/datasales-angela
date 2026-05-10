@@ -55,9 +55,22 @@ async def create_activity(
 
     activity = Activity(**body.model_dump(), created_by=current_user.id)
     db.add(activity)
+
+    # Update last_activity_at for real interactions (not status changes)
+    if body.type in ("llamada", "email", "whatsapp", "reunion", "nota"):
+        from datetime import datetime, timezone
+        contact.last_activity_at = datetime.now(timezone.utc)
+
     await db.commit()
     await db.refresh(activity)
-    return activity
+
+    # Reload with creator relationship to avoid MissingGreenlet on serialization
+    reloaded = await db.execute(
+        select(Activity)
+        .options(selectinload(Activity.creator))
+        .where(Activity.id == activity.id)
+    )
+    return reloaded.scalar_one()
 
 
 @router.delete("/{activity_id}", status_code=204)

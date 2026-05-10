@@ -59,6 +59,7 @@ export interface AssigneeNested {
   id: string;
   name: string;
   avatar_color: string | null;
+  role: string | null;
 }
 
 export interface ContactApiResponse {
@@ -93,6 +94,8 @@ export interface ContactApiResponse {
   is_primary: boolean;
   created_at: string | null;
   updated_at: string | null;
+  status_changed_at: string | null;
+  last_activity_at: string | null;
   company: CompanyNested | null;
   assignee: AssigneeNested | null;
 }
@@ -113,7 +116,7 @@ export interface ActivityOut {
   old_value: string | null;
   new_value: string | null;
   created_at: string | null;
-  creator: { id: string; name: string; avatar_color: string | null } | null;
+  creator: { id: string; name: string; avatar_color: string | null; role: string | null } | null;
 }
 
 export interface EventOut {
@@ -134,6 +137,7 @@ export interface EventOut {
 export interface RankingEntry {
   user_id: string;
   name: string;
+  role: string | null;
   avatar_color: string | null;
   total_contacts: number;
 }

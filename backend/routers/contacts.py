@@ -115,6 +115,11 @@ async def update_contact(
             .values(is_primary=False)
         )
 
+    # Si cambia el status, registrar el timestamp del cambio
+    if "status" in update_data and update_data["status"] != contact.status:
+        from datetime import datetime, timezone
+        contact.status_changed_at = datetime.now(timezone.utc)
+
     for field, value in update_data.items():
         setattr(contact, field, value)
 

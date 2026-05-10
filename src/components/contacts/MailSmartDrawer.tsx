@@ -29,8 +29,44 @@ export const MailSmartDrawer = ({ open, onOpenChange, contact }: MailSmartDrawer
   };
 
   const handleOpenOutlook = () => {
-    const outlookUrl = `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(contact.email || '')}&subject=${encodeURIComponent(template.subject)}&body=${encodeURIComponent(emailBody)}`;
-    window.open(outlookUrl, '_blank');
+    if (!contact.email) {
+      toast({
+        title: 'Falta el email del contacto',
+        description: 'Añade un email al contacto antes de redactar.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const MAX_URL_LENGTH = 2000;
+    const to = encodeURIComponent(contact.email);
+    const subject = encodeURIComponent(template.subject);
+    const body = encodeURIComponent(emailBody);
+    const outlookUrl = `https://outlook.office.com/mail/deeplink/compose?to=${to}&subject=${subject}&body=${body}`;
+
+    if (outlookUrl.length <= MAX_URL_LENGTH) {
+      window.open(outlookUrl, '_blank');
+      return;
+    }
+
+    // Fallback: el cliente de mail del SO suele aceptar URLs más largas que un deeplink web
+    const mailtoUrl = `mailto:${contact.email}?subject=${subject}&body=${body}`;
+    if (mailtoUrl.length <= 8000) {
+      window.location.href = mailtoUrl;
+      toast({
+        title: 'Email muy largo para Outlook web',
+        description: 'Se ha abierto tu cliente de correo predeterminado.',
+      });
+      return;
+    }
+
+    // Último recurso: copiar el texto
+    navigator.clipboard.writeText(emailBody);
+    toast({
+      title: 'Email demasiado largo',
+      description: 'Hemos copiado el texto al portapapeles. Pégalo en tu cliente de correo.',
+      variant: 'destructive',
+    });
   };
 
   return (

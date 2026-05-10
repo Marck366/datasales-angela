@@ -5,6 +5,10 @@ import { useUpdateContact } from '@/hooks/useContacts';
 import { toast } from '@/hooks/use-toast';
 import { ChevronDown, ChevronUp, X, Pencil, Building2, TrendingUp, Sparkles, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  firstError, validateEmail, validatePhone, validatePercent,
+  validatePositiveNumber, validateDateString, validateMaxLength,
+} from '@/lib/validators';
 
 const SERVICIOS = ['B Corp', 'CSRD', 'Huella Carbono', 'ESG Reporting', 'Otro'];
 const CERTIFICACIONES = ['Sin proceso', 'En evaluación', 'En proceso', 'Certificado'];
@@ -115,6 +119,23 @@ export const EditContactModal = ({ open, onOpenChange, contact }: EditContactMod
       toast({ title: 'Nombre y apellido son obligatorios', variant: 'destructive' });
       return;
     }
+
+    const validationError = firstError(
+      validateMaxLength(form.first_name, 100),
+      validateMaxLength(form.last_name, 100),
+      validateMaxLength(form.empresa, 255),
+      validateEmail(form.email),
+      validatePhone(form.phone),
+      validatePositiveNumber(form.valor_potencial),
+      validatePercent(form.probabilidad_cierre),
+      validateDateString(form.fecha_cierre_probable),
+      validateMaxLength(form.next_step, 1000),
+    );
+    if (validationError) {
+      toast({ title: 'Datos no válidos', description: validationError, variant: 'destructive' });
+      return;
+    }
+
     try {
       await updateContact.mutateAsync({
         id: contact.id,

@@ -17,7 +17,7 @@ export const useProfiles = () => {
           id: r.user_id,
           name: r.name,
           email: '',
-          role: 'comercial' as UserRole,
+          role: (r.role as UserRole) || 'comercial',
           avatar_color: r.avatar_color || 'gray',
           created_at: '',
         }))

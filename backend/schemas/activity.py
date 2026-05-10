@@ -9,6 +9,7 @@ class CreatorNested(BaseModel):
     id: str
     name: str
     avatar_color: Optional[str] = None
+    role: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
