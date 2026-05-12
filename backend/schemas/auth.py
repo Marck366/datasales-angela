@@ -10,8 +10,14 @@ class LoginRequest(BaseModel):
 
 
 class TokenResponse(BaseModel):
+    """Legacy — mantenido por compat. El nuevo flujo usa cookie httpOnly."""
     access_token: str
     token_type: str = "bearer"
+
+
+class LoginResponse(BaseModel):
+    ok: bool = True
+    csrf_token: str
 
 
 class UserPublic(BaseModel):

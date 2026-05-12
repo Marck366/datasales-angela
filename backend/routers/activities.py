@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -18,6 +18,8 @@ router = APIRouter()
 @router.get("/", response_model=list[ActivityOut])
 async def list_activities(
     contact_id: str | None = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(200, ge=1, le=1000),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -36,7 +38,8 @@ async def list_activities(
         subq = select(Contact.id).where(Contact.assigned_to == current_user.id)
         query = query.where(Activity.contact_id.in_(subq))
 
-    result = await db.execute(query.order_by(Activity.created_at.desc()))
+    query = query.order_by(Activity.created_at.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
     return result.scalars().all()
 
 

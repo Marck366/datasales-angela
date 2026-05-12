@@ -1,21 +1,27 @@
+import hashlib
 import logging
+import secrets
 import time
 from collections import defaultdict
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from passlib.context import CryptContext
 from database import get_db
+from config import get_settings
 
 logger = logging.getLogger("datasales.auth")
+settings = get_settings()
 from models.user import User
 from schemas.auth import (
-    LoginRequest, TokenResponse, UserPublic, MeResponse,
+    LoginRequest, LoginResponse, UserPublic, MeResponse,
     CreateUserRequest, ChangePasswordRequest, UpdateUserRequest,
 )
-from dependencies.auth import create_access_token, get_current_user
+from dependencies.auth import create_access_token, get_current_user, SESSION_COOKIE_NAME
 from dependencies.permissions import require_admin
+
+CSRF_COOKIE_NAME = "datasales_csrf"
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -45,10 +51,45 @@ def _reset_attempts(key: str) -> None:
     _failed_attempts.pop(key, None)
 
 
-@router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
+def _set_session_cookies(response: Response, token: str) -> str:
+    csrf_token = secrets.token_urlsafe(32)
+    max_age = settings.jwt_expire_hours * 3600
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=token,
+        max_age=max_age,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="lax",
+        path="/",
+    )
+    response.set_cookie(
+        key=CSRF_COOKIE_NAME,
+        value=csrf_token,
+        max_age=max_age,
+        httponly=False,
+        secure=settings.cookie_secure,
+        samesite="lax",
+        path="/",
+    )
+    return csrf_token
+
+
+def _clear_session_cookies(response: Response) -> None:
+    response.delete_cookie(SESSION_COOKIE_NAME, path="/")
+    response.delete_cookie(CSRF_COOKIE_NAME, path="/")
+
+
+@router.post("/login", response_model=LoginResponse)
+async def login(
+    body: LoginRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
     ip = request.client.host if request.client else "unknown"
     email_key = f"email:{body.email.lower()}"
+    email_hash = hashlib.sha256(body.email.lower().encode()).hexdigest()[:12]
 
     _rate_limit_check(email_key)
 
@@ -59,7 +100,7 @@ async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends
 
     if user is None or not pwd_context.verify(body.password, user.hashed_password):
         _record_failed_attempt(email_key)
-        logger.warning("LOGIN_FAILED email=%s ip=%s", body.email, ip)
+        logger.warning("LOGIN_FAILED email_hash=%s ip=%s", email_hash, ip)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email o contraseña incorrectos",
@@ -68,7 +109,14 @@ async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends
     _reset_attempts(email_key)
     logger.info("LOGIN_OK user=%s role=%s ip=%s", user.id, user.role, ip)
     token = create_access_token(user)
-    return TokenResponse(access_token=token)
+    csrf_token = _set_session_cookies(response, token)
+    return LoginResponse(ok=True, csrf_token=csrf_token)
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    _clear_session_cookies(response)
+    return {"ok": True}
 
 
 @router.get("/me", response_model=MeResponse)

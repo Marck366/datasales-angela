@@ -1,33 +1,45 @@
 import axios, { AxiosError } from 'axios';
 
-const TOKEN_KEY = 'datasales_token';
+const CSRF_COOKIE = 'datasales_csrf';
 
-export const getToken = () => localStorage.getItem(TOKEN_KEY);
-export const setToken = (token: string) => localStorage.setItem(TOKEN_KEY, token);
-export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+function readCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+export const hasSession = () => readCookie(CSRF_COOKIE) !== null;
+
+export const clearClientSession = () => {
+  document.cookie = `${CSRF_COOKIE}=; path=/; max-age=0`;
+};
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 export const api = axios.create({
   baseURL,
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
 });
 
-// Inject Bearer token on every request
+// Inject CSRF token header on mutating requests (cookie auth flow)
+const UNSAFE_METHODS = new Set(['post', 'patch', 'put', 'delete']);
 api.interceptors.request.use((config) => {
-  const token = getToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  const method = (config.method || 'get').toLowerCase();
+  if (UNSAFE_METHODS.has(method)) {
+    const csrf = readCookie(CSRF_COOKIE);
+    if (csrf) {
+      config.headers['X-CSRF-Token'] = csrf;
+    }
   }
   return config;
 });
 
-// On 401, clear token and redirect to /login
+// On 401, clear session and redirect to /login
 api.interceptors.response.use(
   (res) => res,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
-      clearToken();
+      clearClientSession();
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
         window.location.href = '/login';
       }
@@ -154,11 +166,14 @@ export interface DashboardStats {
 
 export const authApi = {
   login: async (email: string, password: string) => {
-    const { data } = await api.post<{ access_token: string; token_type: string }>(
+    const { data } = await api.post<{ ok: boolean; csrf_token: string }>(
       '/auth/login',
       { email, password }
     );
     return data;
+  },
+  logout: async () => {
+    await api.post('/auth/logout');
   },
   me: async () => {
     const { data } = await api.get<{ user: UserOut }>('/auth/me');

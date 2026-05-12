@@ -16,6 +16,16 @@ class Settings(BaseSettings):
     anthropic_api_key: str
     allowed_origins: str = "http://localhost:5173"
 
+    environment: str = "development"  # "production" en prod
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.lower() == "production"
+
+    @property
+    def cookie_secure(self) -> bool:
+        return self.is_production
+
     @property
     def database_url(self) -> str:
         return (
