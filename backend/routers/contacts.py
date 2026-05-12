@@ -66,9 +66,12 @@ async def create_contact(
 ):
     from sqlalchemy import update
     
-    contact = Contact(**body.model_dump())
-    if not contact.assigned_to:
-        contact.assigned_to = current_user.id
+    contact_data = body.model_dump()
+    if not is_elevated(current_user):
+        contact_data["assigned_to"] = current_user.id
+    elif not contact_data.get("assigned_to"):
+        contact_data["assigned_to"] = current_user.id
+    contact = Contact(**contact_data)
     db.add(contact)
     await db.commit()
     
@@ -107,6 +110,8 @@ async def update_contact(
         raise HTTPException(status_code=403, detail="Sin acceso a este contacto")
 
     update_data = body.model_dump(exclude_unset=True)
+    if "assigned_to" in update_data and not is_elevated(current_user):
+        raise HTTPException(status_code=403, detail="No puedes reasignar contactos")
     setting_primary = update_data.get("is_primary") is True and contact.company_id
 
     # Si se marca como principal, primero quitar la estrella a todos los demás de la empresa

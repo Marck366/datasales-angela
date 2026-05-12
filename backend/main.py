@@ -1,11 +1,16 @@
 import logging
 import os
 import sys
+import time
+import hashlib
+from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import HTTPException as FastAPIHTTPException, RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
@@ -42,6 +47,32 @@ if not any(isinstance(h, logging.StreamHandler) and not isinstance(h, RotatingFi
     _root.addHandler(_stream_handler)
 
 logger = logging.getLogger("datasales")
+
+_RATE_LIMIT_WINDOW_SECONDS = 60
+_rate_limit_hits: dict[str, deque[float]] = defaultdict(deque)
+
+
+def _hash_log_value(value: str) -> str:
+    return hashlib.sha256(f"{settings.effective_log_hash_salt}:{value}".encode()).hexdigest()[:12]
+
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def _rate_limit_key(request: Request) -> str:
+    return f"{_client_ip(request)}:{request.url.path}"
+
+
+def _is_rate_limited(key: str, limit: int) -> bool:
+    now = time.time()
+    hits = _rate_limit_hits[key]
+    while hits and now - hits[0] > _RATE_LIMIT_WINDOW_SECONDS:
+        hits.popleft()
+    if len(hits) >= limit:
+        return True
+    hits.append(now)
+    return False
 
 
 def _run_migrations() -> None:
@@ -92,6 +123,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+if settings.is_production:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.hosts_list)
+
 # ── CORS (A3: restringido a métodos y headers reales) ──────────────────────
 app.add_middleware(
     CORSMiddleware,
@@ -103,8 +137,17 @@ app.add_middleware(
 
 
 # ── CSRF protection middleware (B1) ────────────────────────────────────────
-CSRF_EXEMPT_PATHS = {"/auth/login", "/auth/logout"}
+CSRF_EXEMPT_PATHS = {"/auth/login"}
 UNSAFE_METHODS = {"POST", "PATCH", "PUT", "DELETE"}
+
+
+@app.middleware("http")
+async def rate_limit(request: Request, call_next):
+    limit = settings.ai_rate_limit_per_minute if request.url.path.startswith("/ai/") else settings.global_rate_limit_per_minute
+    if _is_rate_limited(_rate_limit_key(request), limit):
+        logger.warning("RATE_LIMITED path=%s ip_hash=%s", request.url.path, _hash_log_value(_client_ip(request)))
+        return JSONResponse(status_code=429, content={"detail": "Demasiadas peticiones. Intentalo mas tarde."})
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -128,6 +171,8 @@ async def csrf_protect(request: Request, call_next):
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
+    if "server" in response.headers:
+        del response.headers["server"]
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -152,19 +197,16 @@ async def audit_log(request: Request, call_next):
     path = request.url.path
     if method in ("POST", "PATCH", "PUT", "DELETE") or path.startswith("/auth"):
         logger.info(
-            "AUDIT %s %s → %s | ip=%s",
+            "AUDIT %s %s -> %s | ip_hash=%s",
             method,
             path,
             response.status_code,
-            request.client.host if request.client else "unknown",
+            _hash_log_value(_client_ip(request)),
         )
     return response
 
 
 # ── Handlers de error unificados (A5) ──────────────────────────────────────
-from fastapi.exceptions import HTTPException as FastAPIHTTPException
-
-
 @app.exception_handler(FastAPIHTTPException)
 async def unified_http_exception_handler(request: Request, exc: FastAPIHTTPException):
     if exc.status_code == 404:
@@ -172,6 +214,12 @@ async def unified_http_exception_handler(request: Request, exc: FastAPIHTTPExcep
     if exc.status_code == 403:
         return JSONResponse(status_code=403, content={"detail": "Sin permiso para realizar esta acción"})
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=exc.headers or None)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.warning("VALIDATION_ERROR path=%s count=%s", request.url.path, len(exc.errors()))
+    return JSONResponse(status_code=422, content={"detail": "Datos de entrada no validos"})
 
 
 # ── Routers ────────────────────────────────────────────────────────────────

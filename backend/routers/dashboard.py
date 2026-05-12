@@ -17,21 +17,22 @@ async def get_stats(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    query = select(Contact)
+    base_filter = []
     if not is_elevated(current_user):
-        query = query.where(Contact.assigned_to == current_user.id)
+        base_filter.append(Contact.assigned_to == current_user.id)
 
-    result = await db.execute(query)
-    contacts = result.scalars().all()
+    total_query = select(
+        func.count(Contact.id),
+        func.coalesce(func.sum(Contact.valor_potencial * Contact.probabilidad_cierre / 100), 0.0),
+    ).where(*base_filter)
+    total, pipeline_value = (await db.execute(total_query)).one()
 
-    total = len(contacts)
-    by_status: dict[str, int] = {}
-    pipeline_value = 0.0
-
-    for c in contacts:
-        by_status[c.status] = by_status.get(c.status, 0) + 1
-        if c.valor_potencial and c.probabilidad_cierre:
-            pipeline_value += c.valor_potencial * (c.probabilidad_cierre / 100)
+    status_query = (
+        select(Contact.status, func.count(Contact.id))
+        .where(*base_filter)
+        .group_by(Contact.status)
+    )
+    by_status = {status: count for status, count in (await db.execute(status_query)).all()}
 
     return {
         "total_contacts": total,

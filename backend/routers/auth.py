@@ -51,6 +51,10 @@ def _reset_attempts(key: str) -> None:
     _failed_attempts.pop(key, None)
 
 
+def _hash_log_value(value: str) -> str:
+    return hashlib.sha256(f"{settings.effective_log_hash_salt}:{value}".encode()).hexdigest()[:12]
+
+
 def _set_session_cookies(response: Response, token: str) -> str:
     csrf_token = secrets.token_urlsafe(32)
     max_age = settings.jwt_expire_hours * 3600
@@ -60,7 +64,7 @@ def _set_session_cookies(response: Response, token: str) -> str:
         max_age=max_age,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite="lax",
+        samesite=settings.cookie_samesite,
         path="/",
     )
     response.set_cookie(
@@ -69,7 +73,7 @@ def _set_session_cookies(response: Response, token: str) -> str:
         max_age=max_age,
         httponly=False,
         secure=settings.cookie_secure,
-        samesite="lax",
+        samesite=settings.cookie_samesite,
         path="/",
     )
     return csrf_token
@@ -89,9 +93,12 @@ async def login(
 ):
     ip = request.client.host if request.client else "unknown"
     email_key = f"email:{body.email.lower()}"
+    ip_key = f"ip:{ip}"
     email_hash = hashlib.sha256(body.email.lower().encode()).hexdigest()[:12]
+    ip_hash = _hash_log_value(ip)
 
     _rate_limit_check(email_key)
+    _rate_limit_check(ip_key)
 
     result = await db.execute(
         select(User).where(User.email == body.email, User.is_active == True)
@@ -100,14 +107,16 @@ async def login(
 
     if user is None or not pwd_context.verify(body.password, user.hashed_password):
         _record_failed_attempt(email_key)
-        logger.warning("LOGIN_FAILED email_hash=%s ip=%s", email_hash, ip)
+        _record_failed_attempt(ip_key)
+        logger.warning("LOGIN_FAILED email_hash=%s ip_hash=%s", email_hash, ip_hash)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email o contraseña incorrectos",
         )
 
     _reset_attempts(email_key)
-    logger.info("LOGIN_OK user=%s role=%s ip=%s", user.id, user.role, ip)
+    _reset_attempts(ip_key)
+    logger.info("LOGIN_OK user_hash=%s role=%s ip_hash=%s", _hash_log_value(user.id), user.role, ip_hash)
     token = create_access_token(user)
     csrf_token = _set_session_cookies(response, token)
     return LoginResponse(ok=True, csrf_token=csrf_token)
@@ -150,7 +159,7 @@ async def create_user(
     if existing.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Ya existe un usuario con el email {body.email}",
+            detail="Ya existe un usuario con ese email",
         )
 
     user = User(
@@ -193,8 +202,8 @@ async def update_user(
 
     changed_fields = list(update_data.keys()) + (["password"] if password else [])
     logger.info(
-        "USER_UPDATED by=%s target=%s fields=%s",
-        current_user.id, user.id, ",".join(changed_fields) or "none",
+        "USER_UPDATED by_hash=%s target_hash=%s fields=%s",
+        _hash_log_value(current_user.id), _hash_log_value(user.id), ",".join(changed_fields) or "none",
     )
     return user
 
@@ -209,7 +218,7 @@ async def change_password(
     db: AsyncSession = Depends(get_db),
 ):
     if not pwd_context.verify(body.current_password, current_user.hashed_password):
-        logger.warning("PASSWORD_CHANGE_FAILED user=%s reason=wrong_current", current_user.id)
+        logger.warning("PASSWORD_CHANGE_FAILED user_hash=%s reason=wrong_current", _hash_log_value(current_user.id))
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="La contraseña actual es incorrecta",
@@ -217,6 +226,5 @@ async def change_password(
 
     current_user.hashed_password = pwd_context.hash(body.new_password)
     await db.commit()
-    logger.info("PASSWORD_CHANGED user=%s", current_user.id)
+    logger.info("PASSWORD_CHANGED user_hash=%s", _hash_log_value(current_user.id))
     return {"detail": "Contraseña actualizada correctamente"}
-

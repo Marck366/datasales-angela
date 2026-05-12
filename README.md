@@ -115,16 +115,22 @@ Copia `.env.example` a `.env` en la raíz del proyecto y rellena los valores:
 | `JWT_EXPIRE_HOURS` | Duración del token (recomendado: 24) |
 | `ANTHROPIC_API_KEY` | API Key de Claude para funciones de IA |
 | `ALLOWED_ORIGINS` | CORS origins permitidos (separados por coma) |
+| `ALLOWED_HOSTS` | Hosts HTTP válidos en producción |
+| `LOG_HASH_SALT` | Sal aleatoria para hashear IPs/IDs en logs |
+| `GLOBAL_RATE_LIMIT_PER_MINUTE` | Límite por IP/ruta para API general |
+| `AI_RATE_LIMIT_PER_MINUTE` | Límite por IP/ruta para endpoints de IA |
+| `AI_PII_PROCESSING_ENABLED` | Habilita explícitamente IA con datos de cliente |
+| `ENVIRONMENT` | `development` o `production` |
 
 ---
 
 ## API Endpoints
 
-Documentación interactiva completa en `http://localhost:8000/docs`.
+Documentación interactiva completa en `http://localhost:8000/docs` solo en desarrollo.
 
 | Endpoint | Descripción |
 |---|---|
-| `POST /auth/login` | Login → devuelve JWT |
+| `POST /auth/login` | Login con cookie `HttpOnly` y token CSRF |
 | `GET /auth/me` | Perfil del usuario autenticado |
 | `GET /auth/users` | Listar usuarios del equipo (admin) |
 | `POST /auth/users` | Crear usuario (admin) |

@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Literal
 import anthropic
 from database import get_db
 from models.contact import Contact
@@ -15,9 +15,14 @@ router = APIRouter()
 settings = get_settings()
 
 
+class RecentActivity(BaseModel):
+    type: Literal["nota", "llamada", "email", "whatsapp", "reunion", "estado"]
+    content: str = Field(default="", max_length=500)
+
+
 class PrepararReuionRequest(BaseModel):
     contact_id: str
-    recent_activities: Optional[list[dict]] = []
+    recent_activities: list[RecentActivity] = Field(default_factory=list, max_length=5)
 
 
 @router.post("/preparar-reunion")
@@ -32,18 +37,19 @@ async def preparar_reunion(
         raise HTTPException(status_code=404, detail="Contacto no encontrado")
     if not can_access_contact(current_user, contact.assigned_to):
         raise HTTPException(status_code=403, detail="Sin acceso a este contacto")
+    if not settings.ai_pii_processing_enabled:
+        raise HTTPException(status_code=403, detail="IA con datos de cliente no habilitada")
 
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
     activities_text = ""
     if body.recent_activities:
         activities_text = "\n".join(
-            f"- [{a.get('type', '')}] {a.get('content', '')}" for a in body.recent_activities[-5:]
+            f"- [{a.type}] {a.content}" for a in body.recent_activities[-5:]
         )
 
-    prompt = f"""Eres un asistente de ventas ESG. Prepara un briefing conciso para una reunión con este contacto.
+    prompt = f"""Eres un asistente de ventas ESG. Prepara un briefing conciso sin incluir datos identificativos directos.
 
-Contacto: {contact.first_name} {contact.last_name or ''}
 Cargo: {contact.job_title or 'N/A'}
 Estado: {contact.status}
 Servicio de interés: {contact.servicio_interes or 'N/A'}

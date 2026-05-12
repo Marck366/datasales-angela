@@ -64,7 +64,7 @@ Si necesitas un campo nuevo, sigue este orden estrictamente para evitar errores 
 > ⚠️ Los `max_length` en Pydantic deben ser consistentes con los valores reales en DB. Un `max_length` demasiado corto causa HTTP 500 al serializar la respuesta (el error aparece como CORS en el navegador).
 
 ### Autenticación
-- El token JWT se guarda en `localStorage` con la clave `datasales_token`
+- El token JWT se guarda en cookie `HttpOnly`; el cliente solo lee `datasales_csrf`
 - El interceptor de axios en `src/lib/api.ts` lo inyecta en cada petición
 - En 401, el interceptor limpia el token y redirige a `/login`
 - `useAuth` valida el token llamando a `/auth/me` al inicializar
