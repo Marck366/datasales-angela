@@ -1,16 +1,22 @@
 import axios, { AxiosError } from 'axios';
 
-const CSRF_COOKIE = 'datasales_csrf';
+const CSRF_STORAGE_KEY = 'datasales_csrf';
 
-function readCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
-  return match ? decodeURIComponent(match[1]) : null;
-}
+export const getCsrfToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return window.sessionStorage.getItem(CSRF_STORAGE_KEY);
+};
 
-export const hasSession = () => readCookie(CSRF_COOKIE) !== null;
+export const setCsrfToken = (token: string): void => {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.setItem(CSRF_STORAGE_KEY, token);
+};
 
-export const clearClientSession = () => {
-  document.cookie = `${CSRF_COOKIE}=; path=/; max-age=0`;
+export const hasSession = (): boolean => getCsrfToken() !== null;
+
+export const clearClientSession = (): void => {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.removeItem(CSRF_STORAGE_KEY);
 };
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -21,12 +27,12 @@ export const api = axios.create({
   withCredentials: true,
 });
 
-// Inject CSRF token header on mutating requests (cookie auth flow)
+// Inject CSRF token header on mutating requests (sessionStorage, not cookie)
 const UNSAFE_METHODS = new Set(['post', 'patch', 'put', 'delete']);
 api.interceptors.request.use((config) => {
   const method = (config.method || 'get').toLowerCase();
   if (UNSAFE_METHODS.has(method)) {
-    const csrf = readCookie(CSRF_COOKIE);
+    const csrf = getCsrfToken();
     if (csrf) {
       config.headers['X-CSRF-Token'] = csrf;
     }

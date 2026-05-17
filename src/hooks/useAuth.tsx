@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { authApi, hasSession, clearClientSession, type UserOut } from '@/lib/api';
+import { authApi, hasSession, clearClientSession, setCsrfToken, type UserOut } from '@/lib/api';
 import { Profile, UserRole } from '@/types';
 
 interface AuthContextType {
@@ -50,7 +50,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
-      await authApi.login(email, password);
+      const { csrf_token } = await authApi.login(email, password);
+      setCsrfToken(csrf_token);
       const { user } = await authApi.me();
       setProfile(mapUserToProfile(user));
       return { error: null };

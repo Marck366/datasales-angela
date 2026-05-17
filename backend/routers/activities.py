@@ -87,8 +87,15 @@ async def delete_activity(
     if activity is None:
         raise HTTPException(status_code=404, detail="Actividad no encontrada")
 
-    if not is_elevated(current_user) and activity.created_by != current_user.id:
-        raise HTTPException(status_code=403, detail="No puedes eliminar esta actividad")
+    if not is_elevated(current_user):
+        contact_result = await db.execute(
+            select(Contact).where(Contact.id == activity.contact_id)
+        )
+        contact = contact_result.scalar_one_or_none()
+        if contact is None or not can_access_contact(current_user, contact.assigned_to):
+            raise HTTPException(status_code=403, detail="Sin acceso a este contacto")
+        if activity.created_by != current_user.id:
+            raise HTTPException(status_code=403, detail="No puedes eliminar esta actividad")
 
     await db.delete(activity)
     await db.commit()

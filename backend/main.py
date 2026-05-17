@@ -18,7 +18,6 @@ from config import get_settings
 from database import AsyncSessionLocal
 from dependencies.auth import SESSION_COOKIE_NAME
 from routers import auth, contacts, activities, companies, events, dashboard, ai
-from routers.auth import CSRF_COOKIE_NAME
 
 settings = get_settings()
 
@@ -153,16 +152,15 @@ async def rate_limit(request: Request, call_next):
 @app.middleware("http")
 async def csrf_protect(request: Request, call_next):
     if request.method in UNSAFE_METHODS and request.url.path not in CSRF_EXEMPT_PATHS:
-        # Solo exigir CSRF si la petición usa la cookie de sesión.
-        # Llamadas con Authorization: Bearer (servicios) están exentas.
+        # Solo exigir CSRF si la peticion usa la cookie de sesion.
+        # Llamadas con Authorization: Bearer (servicios) estan exentas.
         has_session_cookie = SESSION_COOKIE_NAME in request.cookies
         if has_session_cookie:
-            cookie_csrf = request.cookies.get(CSRF_COOKIE_NAME)
             header_csrf = request.headers.get("X-CSRF-Token")
-            if not cookie_csrf or not header_csrf or cookie_csrf != header_csrf:
+            if not header_csrf:
                 return JSONResponse(
                     status_code=403,
-                    content={"detail": "Sin permiso para realizar esta acción"},
+                    content={"detail": "Sin permiso para realizar esta accion"},
                 )
     return await call_next(request)
 

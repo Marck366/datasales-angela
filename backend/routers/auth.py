@@ -67,21 +67,11 @@ def _set_session_cookies(response: Response, token: str) -> str:
         samesite=settings.cookie_samesite,
         path="/",
     )
-    response.set_cookie(
-        key=CSRF_COOKIE_NAME,
-        value=csrf_token,
-        max_age=max_age,
-        httponly=False,
-        secure=settings.cookie_secure,
-        samesite=settings.cookie_samesite,
-        path="/",
-    )
     return csrf_token
 
 
 def _clear_session_cookies(response: Response) -> None:
     response.delete_cookie(SESSION_COOKIE_NAME, path="/")
-    response.delete_cookie(CSRF_COOKIE_NAME, path="/")
 
 
 @router.post("/login", response_model=LoginResponse)
